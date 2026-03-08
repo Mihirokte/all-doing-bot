@@ -197,7 +197,10 @@ class LLMEngine:
                     return output
             except Exception as exc:  # noqa: BLE001
                 last_error = exc
-                logger.warning("Provider %s failed: %s", provider.provider_name, exc)
+                if provider.provider_name == "remote":
+                    logger.info("Remote API unavailable (%s); proceeding with next provider (e.g. local)", exc)
+                else:
+                    logger.warning("Provider %s failed: %s", provider.provider_name, exc)
         if last_error is not None:
             raise RuntimeError(f"All LLM providers failed: {last_error}") from last_error
         raise RuntimeError("No LLM providers available")

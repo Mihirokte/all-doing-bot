@@ -38,9 +38,9 @@ async def lifespan(app: FastAPI):
     if settings.remote_llm_api_key:
         logger.info("Remote LLM API key configured (REMOTE_LLM_API_KEY set)")
     else:
-        logger.warning("Remote LLM API key not set (REMOTE_LLM_API_KEY); effective LLM may be mock-only")
+        logger.info("Remote LLM API not configured (REMOTE_LLM_API_KEY unset); will use local or mock when needed")
     if not settings.model_file_path and not settings.remote_llm_api_key:
-        logger.warning("Running with mock LLM only; set REMOTE_LLM_API_KEY or MODEL_PATH for real output")
+        logger.info("No remote or local model configured; using mock LLM. Set REMOTE_LLM_API_KEY or MODEL_PATH for real output")
     # Persistence
     if not settings.spreadsheet_id:
         logger.warning("SPREADSHEET_ID not set; persistence will use in-memory fake if creds also missing")
