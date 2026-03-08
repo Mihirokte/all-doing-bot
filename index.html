@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>All Doing Bot: The Experience</title>
+  
+  <!-- 64-bit Analog Font (VT323 for CRT feel) -->
+  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+  
+  <!-- Custom Styles -->
+  <link rel="stylesheet" href="css/style.css" />
+  
+  <!-- Phaser 3 -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
+  <!-- Google Auth -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+  <!-- Hidden inputs to interact with the original logic -->
+  <div class="hidden-inputs">
+    <input type="text" id="query-input" placeholder="Query..." />
+    <button type="button" id="submit-btn">Submit</button>
+  </div>
+
+  <!-- Login Overlay -->
+  <div id="login-overlay">
+    <div class="login-panel">
+      <h1>[ DEFENSE SYSTEM OFFLINE ]</h1>
+      <p>AUTHENTICATION REQUIRED FOR TERMINAL ACCESS</p>
+      
+      <div id="g_id_onload" style="margin-top: 20px;"></div>
+      
+      <!-- Shown only on localhost; hidden in production (auth.js) -->
+      <button id="dev-bypass-btn" class="analog-btn" style="margin-top:20px;">[ EMERGENCY OVERRIDE (DEV) ]</button>
+    </div>
+  </div>
+
+  <!-- The Phaser Game Container (Hidden until logged in) -->
+  <div id="game-container" style="display: none;">
+    
+    <!-- HTML UI Layer to interact with DOM elements dynamically on top of the canvas -->
+    <div id="html-ui-layer">
+      
+      <!-- Dialogue Box Input -->
+      <div id="dialog-box" class="game-dialog">
+        <label for="game-query-input" style="font-size: 10px; color: #4CAF50; margin-bottom: 5px; display: block;">> SYSTEM COMMAND:</label>
+        <input type="text" id="game-query-input" placeholder="Type a request and press Enter..." autocomplete="off"/>
+      </div>
+      
+  <!-- Data Core Panel -->
+      <div id="archives-panel" class="archives-panel">
+        <div class="close-btn" id="close-archives">[ X CLOSE CONNECTION ]</div>
+        <h2 id="cohort-title">DATA CORE ACCESS</h2>
+        <div class="archives-content">
+          <div id="cohorts-list">Loading…</div>
+          <div id="entries" style="margin-top:20px;"></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div> <!-- End game-container -->
+
+  <!-- Production: set these before config/auth (uncomment and replace). -->
+  <!-- <script>window.BACKEND_URL = "https://your-actual-backend-host.com";</script> -->
+  <!-- <script>window.GOOGLE_CLIENT_ID = "your-oauth-client-id.apps.googleusercontent.com";</script> -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+  
+  <!-- Auth Logic -->
+  <script src="js/auth.js"></script>
+
+  <script>
+    window.onload = function () {
+      initGoogleAuth();
+    };
+  </script>
+</body>
+</html>
