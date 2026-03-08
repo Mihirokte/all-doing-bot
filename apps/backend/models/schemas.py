@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,11 +17,11 @@ class QueryAcceptResponse(BaseModel):
 class TaskResult(BaseModel):
     """Result payload when task completes (or error info when failed)."""
 
-    cohort_name: str | None = None
-    entries_added: int | None = None
-    message: str | None = None
-    error: str | None = None
-    raw: dict[str, Any] | None = None
+    cohort_name: Optional[str] = None
+    entries_added: Optional[int] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    raw: Optional[Dict[str, Any]] = None
 
 
 class TaskStatusResponse(BaseModel):
@@ -29,10 +29,10 @@ class TaskStatusResponse(BaseModel):
 
     task_id: str
     status: str  # processing | completed | failed
-    query: str | None = None
-    result: TaskResult | None = None
-    created_at: datetime | None = None
-    updated_at: datetime | None = None
+    query: Optional[str] = None
+    result: Optional["TaskResult"] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
 
 class CohortInfo(BaseModel):
@@ -53,7 +53,7 @@ class CohortEntry(BaseModel):
     entry_id: int
     content: str
     source: str = ""
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
 
 
@@ -66,7 +66,7 @@ class ParsedIntent(BaseModel):
     cohort_name: str
     cohort_description: str = ""
     action_type: str = "web_fetch"
-    action_params: dict[str, Any] = Field(default_factory=dict)
+    action_params: Dict[str, Any] = Field(default_factory=dict)
     summary: str = ""
 
 
@@ -74,13 +74,13 @@ class PlanStep(BaseModel):
     """One step in the execution plan."""
 
     action: str
-    params: dict[str, Any] = Field(default_factory=dict)
+    params: Dict[str, Any] = Field(default_factory=dict)
 
 
 class PlanOutput(BaseModel):
     """Output of Plan stage: list of steps."""
 
-    steps: list[PlanStep] = Field(default_factory=list)
+    steps: list[PlanStep] = Field(default_factory=list)  # list[] ok on 3.9
 
 
 class ParseResult(ParsedIntent):
@@ -96,4 +96,4 @@ class SummarizeResult(BaseModel):
 
     title: str
     summary: str
-    key_fields: dict[str, Any] = Field(default_factory=dict)
+    key_fields: Dict[str, Any] = Field(default_factory=dict)

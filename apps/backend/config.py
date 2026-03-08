@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import List, Optional
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -28,7 +29,7 @@ class Settings(BaseSettings):
     remote_llm_model: str = "llama-3.1-8b-instant"
 
     # Extractor / site adapter settings
-    nitter_instances: list[str] = Field(
+    nitter_instances: List[str] = Field(
         default_factory=lambda: [
             "https://nitter.net",
             "https://nitter.poast.org",
@@ -43,25 +44,25 @@ class Settings(BaseSettings):
     cors_allow_origins: str = "https://mihirokte.github.io,http://localhost:3000,http://127.0.0.1:3000"
 
     @property
-    def credentials_path(self) -> Path | None:
+    def credentials_path(self) -> Optional[Path]:
         if not self.google_creds_path:
             return None
         path = Path(self.google_creds_path)
         return path if path.exists() else None
 
     @property
-    def model_file_path(self) -> Path | None:
+    def model_file_path(self) -> Optional[Path]:
         if not self.model_path:
             return None
         path = Path(self.model_path)
         return path if path.exists() else None
 
     @property
-    def llm_provider_order(self) -> list[str]:
+    def llm_provider_order(self) -> List[str]:
         return [part.strip().lower() for part in self.llm_provider_priority.split(",") if part.strip()]
 
     @property
-    def cors_origins_list(self) -> list[str]:
+    def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
 
 
