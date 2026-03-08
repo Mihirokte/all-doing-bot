@@ -1,80 +1,114 @@
 # all-doing-bot
 
-A personal, always-on LLM-powered bot that turns natural language queries into structured data pipelines. Ask it to do something, and it creates a **cohort** (a named collection), defines an **action** (a repeatable task), executes it via a locally-hosted LLM, and stores results in Google Sheets.
+`all-doing-bot` is a personal, always-on LLM-powered automation bot that turns natural-language requests into structured pipelines. A query is parsed into a cohort and an action, executed through a staged backend pipeline, and stored in Google Sheets.
 
 ## Architecture
 
-```
-┌─────────────────┐       GET        ┌────────────────────────────┐
-│  GitHub Pages   │ ───────────────► │  FastAPI Backend           │
-│  (Frontend)     │ ◄─────────────── │  (AWS EC2, always-on)      │
-└─────────────────┘    JSON response │                            │
-                                     │  Query → Parse → Plan      │
-                                     │    → Execute → Store        │
-                                     │                            │
-                                     │  LLM: Qwen3.5-2B (CPU)    │
-                                     │  via llama.cpp             │
-                                     └─────────┬──────────────────┘
-                                               │
-                                               ▼
-                                     ┌────────────────────────┐
-                                     │  Google Sheets / Drive  │
-                                     │  (Cohort-based storage) │
-                                     └────────────────────────┘
+```text
+GitHub Pages / static frontend
+        |
+        v
+FastAPI backend
+Parse -> Plan -> Execute -> Store
+        |
+        v
+Google Sheets / Drive
 ```
 
-## How It Works
+The backend now supports three LLM runtime modes:
 
-1. **You send a query**: *"Fetch me latest Twitter posts about AI agents"*
-2. **Parse**: The LLM extracts intent → cohort name, action type, parameters.
-3. **Plan**: The LLM generates execution steps (search, extract, summarize).
-4. **Execute**: The action engine fetches web content, cleans it to markdown, and processes it through focused LLM calls.
-5. **Store**: Results are written to a Google Sheet under the cohort's tab.
+- `local`: GGUF model through `llama-cpp-python`
+- `remote`: free-tier OpenAI-compatible provider
+- `mock`: deterministic canned responses for development and tests
 
-Each LLM call is small and focused (< 1000 input tokens). Web pages are converted to clean markdown before the LLM sees them, following the [markdowner](https://github.com/supermemoryai/markdowner) approach.
+## Repository Layout
 
-## Tech Stack
-
-| Component | Technology |
-|-----------|-----------|
-| LLM | Qwen3.5-2B (Q4 quantized) via llama-cpp-python |
-| Backend | FastAPI + uvicorn (Python 3.11+) |
-| Database | Google Sheets via gspread |
-| Web extraction | readability-lxml + markdownify |
-| Frontend | Static HTML/JS on GitHub Pages |
-| Hosting | AWS EC2 free tier + systemd |
-
-## Design Principles
-
-- **Structured pipeline**: Every query flows through Parse → Plan → Execute → Store. No shortcuts.
-- **Minimal token usage**: Each LLM call gets only the data it needs. No conversation history accumulation.
-- **General & extensible**: New action types are added by creating one file. No pipeline changes needed.
-- **Cohort-based storage**: Google Sheets as a human-readable, browsable database. One sheet per category.
-
-Architectural inspiration from [agent-orchestrator](https://github.com/ComposioHQ/agent-orchestrator) — plugin architecture, work delegation, and structured pipelines.
-
-## Repository Structure
-
-```
+```text
 all-doing-bot/
-├── README.md              # This file
-├── CLAUDE.md              # Agent instructions for AI coding assistants
-├── plan.md                # Detailed implementation plan (7 phases)
-├── backend/               # FastAPI server, LLM pipeline, actions, DB layer
-├── frontend/              # GitHub Pages static site
-└── tests/                 # pytest test suite
+├── AGENTS.md
+├── README.md
+├── LICENSE
+├── apps/
+│   ├── backend/
+│   └── frontend/
+├── docs/
+│   ├── implementation-plan.md
+│   ├── architecture/
+│   └── instructions/
+└── tests/
 ```
+
+## Quick Start
+
+Install backend dependencies from the repo root:
+
+```bash
+python -m pip install -r apps/backend/requirements.txt
+```
+
+Run the backend from the repo root:
+
+```bash
+python -m uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
+```
+
+Run the frontend locally:
+
+```bash
+cd apps/frontend
+python -m http.server 3000
+```
+
+Run tests:
+
+```bash
+python -m pytest tests -q
+```
+
+## Environment variables
+
+For real LLM output and real persistence, configure the backend via a `.env` file (copy from `.env.example`).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `REMOTE_LLM_API_KEY` | For real LLM | API key for remote OpenAI-compatible provider. If unset, the backend may use mock or local-only. |
+| `REMOTE_LLM_BASE_URL` | No | Base URL for remote LLM API (default: `https://api.groq.com/openai/v1`). |
+| `REMOTE_LLM_MODEL` | No | Model name for remote API (default: `llama-3.1-8b-instant`). |
+| `LLM_PROVIDER_PRIORITY` | No | Comma-separated provider order: `local`, `remote`, `mock` (default: `local,remote,mock`). |
+| `GOOGLE_CREDS_PATH` | For real persistence | Path to Google service account JSON. If unset, backend uses in-memory fake persistence. |
+| `SPREADSHEET_ID` | For real persistence | Google Sheet ID for catalogue and cohort data. |
+| `CORS_ALLOW_ORIGINS` | No | Comma-separated origins for CORS (e.g. `http://localhost:3000`). |
+| `HOST` | No | Bind host (default: `0.0.0.0`). |
+| `PORT` | No | Bind port (default: `8000`). |
+
+Optional for local GGUF: `MODEL_PATH` — path to a local model file when using the `local` provider.
+
+## Before deploying (frontend + backend)
+
+**Frontend** (`apps/frontend/index.html`): Uncomment and set before going live:
+- `window.BACKEND_URL` — your backend host (e.g. EC2 or Render URL).
+- `window.GOOGLE_CLIENT_ID` — Google OAuth client ID registered for your GitHub Pages domain.
+
+The dev bypass button is shown only on localhost; it is hidden in production.
+
+**Backend** (env on EC2/Render/etc.):
+- `CORS_ALLOW_ORIGINS=https://your-github-pages-url.github.io` (comma-separated if multiple).
+- `REMOTE_LLM_API_KEY=<your-groq-key>` (or another provider key).
+
+Backend endpoints currently have no authentication. For production, consider adding API key or OAuth verification if the app is public.
 
 ## Documentation
 
-| Document | Purpose |
-|----------|---------|
-| [plan.md](./plan.md) | Phased implementation plan with tasks, file structures, and acceptance criteria |
-| [CLAUDE.md](./CLAUDE.md) | Coding conventions, architecture rules, and instructions for AI agents building this project |
+- [AGENTS.md](./AGENTS.md): primary repo-level instructions for coding agents
+- [docs/implementation-plan.md](./docs/implementation-plan.md): phased implementation plan
+- [docs/architecture/overview.md](./docs/architecture/overview.md): monorepo and system structure overview
+- [docs/deployment/aws-credentials-and-deploy.md](./docs/deployment/aws-credentials-and-deploy.md): AWS credentials for deploy agents, IAM roles, and EC2 setup/update
+- [docs/instructions/backend-workflow.md](./docs/instructions/backend-workflow.md): backend-specific workflow guidance
+- [docs/instructions/frontend-workflow.md](./docs/instructions/frontend-workflow.md): frontend-specific workflow guidance
 
 ## Status
 
-**Pre-implementation** — Documentation and architecture planning phase. See [plan.md](./plan.md) for the full roadmap.
+Active implementation is underway. The repo now uses a monorepo-style layout with `apps/backend` and `apps/frontend`, while tests remain at the repo root.
 
 ## License
 

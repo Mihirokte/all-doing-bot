@@ -1,0 +1,258 @@
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #000;
+  color: #fff;
+  font-family: 'VT323', monospace;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  /* subtle CRT glow behind everything */
+  box-shadow: inset 0 0 100px rgba(0, 50, 0, 0.5);
+}
+
+/* Base button style for auth screen */
+.analog-btn {
+  background: transparent;
+  color: #00ff00;
+  border: 2px solid #00ff00;
+  padding: 15px 30px;
+  font-family: 'VT323', monospace;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  transition: all 0.2s;
+  text-shadow: 0 0 5px #00ff00;
+}
+
+.analog-btn:hover {
+  background: #00ff00;
+  color: #000;
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+}
+
+/* Login Overlay */
+#login-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #0a0e0a;
+  background-image: 
+    linear-gradient(rgba(0, 255, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 255, 0, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+}
+
+.login-panel {
+  text-align: center;
+  border: 4px solid #336633;
+  padding: 40px;
+  background: rgba(0, 10, 0, 0.9);
+  box-shadow: 0 0 30px rgba(0, 255, 0, 0.2);
+}
+
+.login-panel h1 {
+  color: #ff3333;
+  text-shadow: 0 0 10px #ff0000;
+  font-size: 40px;
+}
+
+.login-panel p {
+  color: #00ff00;
+  font-size: 20px;
+}
+
+#game-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-width: 1200px;
+  max-height: 800px;
+  box-shadow: 0 0 40px rgba(0, 200, 255, 0.2);
+  /* pixelated off for 64-bit high fidelity */
+}
+
+canvas {
+  display: block;
+}
+
+/* CRT Scanline Overlay over the entire game container */
+#game-container::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: linear-gradient(
+    rgba(18, 16, 16, 0) 50%, 
+    rgba(0, 0, 0, 0.25) 50%
+  );
+  background-size: 100% 4px;
+  pointer-events: none;
+  z-index: 50; /* over the game, but under raw popups if carefully placed */
+}
+
+.hidden-inputs {
+  display: none;
+}
+
+#html-ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Shared UI box style for DOM overlays */
+.game-dialog {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  height: 120px;
+  background-color: rgba(0, 15, 0, 0.9);
+  border: 2px solid #00ff00;
+  border-radius: 4px;
+  padding: 15px;
+  box-sizing: border-box;
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: inset 0 0 15px rgba(0, 255, 0, 0.3), 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+.game-dialog.active {
+  display: flex;
+}
+
+.game-dialog input {
+  font-family: 'VT323', monospace;
+  background: transparent;
+  border: none;
+  color: #00ff00;
+  font-size: 24px;
+  width: 100%;
+  outline: none;
+  text-shadow: 0 0 5px #00ff00;
+}
+
+.game-dialog input::placeholder {
+  color: #225522;
+}
+
+/* Archives Terminal */
+.archives-panel {
+  pointer-events: auto;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 85%;
+  height: 85%;
+  background-color: rgba(5, 10, 15, 0.95);
+  border: 4px solid #00ffff;
+  box-shadow: 0 0 20px rgba(0, 255, 255, 0.4), inset 0 0 30px rgba(0, 255, 255, 0.1);
+  padding: 20px;
+  display: none;
+  flex-direction: column;
+  color: #00ffff;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.archives-panel.active {
+  display: flex;
+}
+
+.archives-panel h2 {
+  text-align: center;
+  margin-top: 0;
+  font-size: 28px;
+  text-shadow: 0 0 8px #00ffff;
+  border-bottom: 2px solid #00ffff;
+  padding-bottom: 10px;
+}
+
+.archives-content {
+  flex-grow: 1;
+  overflow-y: auto;
+  margin-top: 10px;
+}
+
+.close-btn {
+  font-family: 'VT323', monospace;
+  align-self: flex-end;
+  cursor: pointer;
+  font-size: 24px;
+  color: #ff3333;
+  margin-bottom: 10px;
+}
+
+.close-btn:hover {
+  text-shadow: 0 0 10px #ff0000;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: #000; 
+  border-left: 1px solid #00ffff;
+}
+::-webkit-scrollbar-thumb {
+  background: #00ffff; 
+}
+
+/* Cohort buttons */
+.cohort-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: #051015;
+  color: #00ffff;
+  border: 1px solid #00ffff;
+  padding: 10px;
+  margin-bottom: 10px;
+  font-family: 'Courier New', Courier, monospace;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.cohort-btn:hover {
+  background: #00ffff;
+  color: #000;
+}
+
+/* Results table */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+th, td {
+  border: 1px solid #00ffff;
+  padding: 8px;
+  text-align: left;
+}
+
+th {
+  background: #003333;
+  color: #fff;
+}

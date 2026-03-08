@@ -1,0 +1,19 @@
+[Unit]
+Description=all-doing-bot FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/all-doing-bot
+Environment="PYTHONPATH=/home/ubuntu/all-doing-bot"
+Environment="PATH=/home/ubuntu/all-doing-bot/venv/bin:/usr/bin:/bin"
+ExecStart=/home/ubuntu/all-doing-bot/venv/bin/uvicorn apps.backend.main:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=alldoing
+
+[Install]
+WantedBy=multi-user.target
