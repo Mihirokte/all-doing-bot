@@ -105,6 +105,37 @@ class LocalProvider(LLMProvider):
         return str(result).strip()
 
 
+class OllamaProvider(LLMProvider):
+    """Local Ollama server (OpenAI-compatible API at /v1/chat/completions)."""
+
+    provider_name = "ollama"
+
+    @property
+    def available(self) -> bool:
+        return bool(settings.ollama_base_url and settings.ollama_model)
+
+    async def generate(self, prompt: str, max_tokens: int = 256, json_mode: bool = True) -> str:
+        base = settings.ollama_base_url.rstrip("/")
+        url = f"{base}/v1/chat/completions"
+        payload = {
+            "model": settings.ollama_model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1,
+            "max_tokens": max_tokens,
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url, json=payload)
+            response.raise_for_status()
+            data = response.json()
+        choices = data.get("choices") if isinstance(data, dict) else None
+        if not choices:
+            raise RuntimeError("Ollama response missing or empty 'choices'")
+        msg = choices[0].get("message") if isinstance(choices[0], dict) else None
+        if not isinstance(msg, dict):
+            raise RuntimeError("Ollama response 'choices[0].message' is missing")
+        return (msg.get("content") or "").strip()
+
+
 class RemoteProvider(LLMProvider):
     """OpenAI-compatible remote API provider (Groq by default)."""
 
@@ -171,6 +202,7 @@ class LLMEngine:
 
     def _build_providers(self) -> list[LLMProvider]:
         provider_map: dict[str, LLMProvider] = {
+            "ollama": OllamaProvider(),
             "local": LocalProvider(),
             "remote": RemoteProvider(),
             "mock": MockProvider(),
@@ -199,6 +231,8 @@ class LLMEngine:
                 last_error = exc
                 if provider.provider_name == "remote":
                     logger.info("Remote API unavailable (%s); proceeding with next provider (e.g. local)", exc)
+                elif provider.provider_name == "ollama":
+                    logger.info("Ollama unavailable (%s); proceeding with next provider", exc)
                 else:
                     logger.warning("Provider %s failed: %s", provider.provider_name, exc)
         if last_error is not None:

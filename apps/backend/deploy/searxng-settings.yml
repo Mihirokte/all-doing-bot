@@ -1,0 +1,11 @@
+# Minimal SearXNG config for local JSON API (backend web search).
+# Copy to /etc/searxng/settings.yml or set SEARXNG_SETTINGS_PATH.
+use_default_settings: true
+server:
+  secret_key: "change-me-in-production-use-openssl-rand-hex-32"
+  bind_address: "127.0.0.1:8888"
+  base_url: "http://127.0.0.1:8888/"
+search:
+  safe_search: 0
+  formats:
+    - json

@@ -23,12 +23,17 @@ class Settings(BaseSettings):
     # If set, find existing spreadsheet by this title or create it. Ignored when SPREADSHEET_ID is set.
     google_sheets_spreadsheet_name: str = "all-doing-bot cohorts"
 
-    # LLM provider selection
-    llm_provider_priority: str = "local,remote,mock"
+    # LLM provider selection (ollama = local Ollama server, e.g. qwen3.5:4b)
+    llm_provider_priority: str = "ollama,local,remote,mock"
     model_path: str = ""
+    # Ollama (local server, OpenAI-compatible at /v1/chat/completions)
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen3.5:4b"
     remote_llm_api_key: str = ""
     remote_llm_base_url: str = "https://api.groq.com/openai/v1"
     remote_llm_model: str = "llama-3.1-8b-instant"
+    # SearXNG (web search, optional)
+    searxng_base_url: str = "http://localhost:8888"
 
     # Extractor / site adapter settings
     nitter_instances: List[str] = Field(

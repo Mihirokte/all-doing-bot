@@ -8,12 +8,14 @@ from apps.backend.actions.api_call import ApiCallAction
 from apps.backend.actions.base import BaseAction
 from apps.backend.actions.transform import TransformAction
 from apps.backend.actions.web_fetch import WebFetchAction
+from apps.backend.actions.web_search import WebSearchAction
 from apps.backend.db.models import Entry
 
 logger = logging.getLogger(__name__)
 
 REGISTRY: dict[str, type[BaseAction]] = {
     "web_fetch": WebFetchAction,
+    "search_web": WebSearchAction,
     "api_call": ApiCallAction,
     "transform": TransformAction,
 }

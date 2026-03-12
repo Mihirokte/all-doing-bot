@@ -31,6 +31,8 @@ async def lifespan(app: FastAPI):
     """Startup: log LLM/persistence mode; shutdown: cancel background tasks."""
     # LLM provider resolution
     logger.info("LLM provider order: %s", settings.llm_provider_order)
+    if settings.ollama_base_url and settings.ollama_model:
+        logger.info("Ollama configured: %s (model=%s)", settings.ollama_base_url, settings.ollama_model)
     if settings.model_file_path:
         logger.info("Local model configured: %s", settings.model_path)
     else:
