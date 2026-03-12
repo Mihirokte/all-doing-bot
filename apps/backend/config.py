@@ -17,9 +17,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Google Sheets
+    # Google Sheets (Drive + Sheets APIs: find or create spreadsheet by name)
     google_creds_path: str = ""
     spreadsheet_id: str = ""
+    # If set, find existing spreadsheet by this title or create it. Ignored when SPREADSHEET_ID is set.
+    google_sheets_spreadsheet_name: str = "all-doing-bot cohorts"
 
     # LLM provider selection
     llm_provider_priority: str = "local,remote,mock"

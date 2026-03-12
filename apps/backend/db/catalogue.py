@@ -56,7 +56,8 @@ class FakeCatalogue(CatalogueBackend):
 
 
 def _get_backend() -> CatalogueBackend:
-    if settings.credentials_path and settings.spreadsheet_id:
+    from apps.backend.db.google_client import spreadsheet_available
+    if spreadsheet_available():
         try:
             from apps.backend.db.google_catalogue import GoogleCatalogue
             return GoogleCatalogue()

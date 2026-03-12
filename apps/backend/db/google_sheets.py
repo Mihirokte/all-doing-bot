@@ -19,17 +19,8 @@ class GoogleSheets:
     """Sheets backend using gspread. Writes/reads cohort data to worksheets named by cohort."""
 
     def __init__(self) -> None:
-        creds_path = settings.credentials_path
-        if not creds_path:
-            raise ValueError("GOOGLE_CREDS_PATH is not set or file not found")
-        if not settings.spreadsheet_id:
-            raise ValueError("SPREADSHEET_ID is not set")
-        import gspread
-        from google.oauth2.service_account import Credentials
-        scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-        creds = Credentials.from_service_account_file(str(creds_path), scopes=scopes)
-        self._client = gspread.authorize(creds)
-        self._spreadsheet = self._client.open_by_key(settings.spreadsheet_id)
+        from apps.backend.db.google_client import get_or_create_spreadsheet
+        self._spreadsheet = get_or_create_spreadsheet()
 
     def _worksheet(self, cohort_name: str):
         """Return worksheet for cohort (blocking)."""

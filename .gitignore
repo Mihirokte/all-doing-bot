@@ -5,6 +5,9 @@ __pycache__/
 .venv/
 venv/
 .env
+# Google service account key (do not commit)
+poke-tasks-433-*.json
+*-service-account*.json
 
 # IDE / OS
 .idea/

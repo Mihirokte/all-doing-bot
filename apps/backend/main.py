@@ -41,15 +41,22 @@ async def lifespan(app: FastAPI):
         logger.info("Remote LLM API not configured (REMOTE_LLM_API_KEY unset); will use local or mock when needed")
     if not settings.model_file_path and not settings.remote_llm_api_key:
         logger.info("No remote or local model configured; using mock LLM. Set REMOTE_LLM_API_KEY or MODEL_PATH for real output")
-    # Persistence
-    if not settings.spreadsheet_id:
-        logger.warning("SPREADSHEET_ID not set; persistence will use in-memory fake if creds also missing")
+    # Persistence (Drive + Sheets: by SPREADSHEET_ID or find/create by GOOGLE_SHEETS_SPREADSHEET_NAME)
+    from apps.backend.db.google_client import spreadsheet_available
     if not settings.credentials_path:
         logger.warning("GOOGLE_CREDS_PATH not set or file not found; persistence will use in-memory fake")
-    if settings.credentials_path and settings.spreadsheet_id:
-        logger.info("Google persistence configured (GOOGLE_CREDS_PATH + SPREADSHEET_ID)")
+    elif spreadsheet_available():
+        if settings.spreadsheet_id:
+            logger.info("Google persistence configured (GOOGLE_CREDS_PATH + SPREADSHEET_ID)")
+        else:
+            logger.info(
+                "Google persistence configured (GOOGLE_CREDS_PATH + GOOGLE_SHEETS_SPREADSHEET_NAME=%s; find or create)",
+                settings.google_sheets_spreadsheet_name or "all-doing-bot cohorts",
+            )
     else:
-        logger.warning("Running with in-memory (fake) persistence; set GOOGLE_CREDS_PATH and SPREADSHEET_ID for real persistence")
+        logger.warning(
+            "Set GOOGLE_CREDS_PATH and either SPREADSHEET_ID or GOOGLE_SHEETS_SPREADSHEET_NAME for real persistence"
+        )
     yield
     # Allow in-flight pipeline tasks to finish briefly
     await asyncio.sleep(0.5)

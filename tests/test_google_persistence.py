@@ -71,18 +71,11 @@ def _mock_spreadsheet():
     return spread
 
 
-@patch("google.oauth2.service_account.Credentials")
-@patch("gspread.authorize")
-@patch("apps.backend.db.google_sheets.settings")
-def test_google_sheets_add_and_get_entries(settings_mock, authorize_mock, creds_mock, tmp_path):
-    settings_mock.credentials_path = tmp_path / "creds.json"
-    (tmp_path / "creds.json").write_text("{}")
-    settings_mock.spreadsheet_id = "test-id"
+@patch("apps.backend.db.google_client.get_or_create_spreadsheet")
+def test_google_sheets_add_and_get_entries(get_spreadsheet_mock, tmp_path):
     spread = _mock_spreadsheet()
     spread.worksheet("cohort_a")  # create cohort sheet with header
-    client_mock = MagicMock()
-    client_mock.open_by_key.return_value = spread
-    authorize_mock.return_value = client_mock
+    get_spreadsheet_mock.return_value = spread
 
     from apps.backend.db.google_sheets import GoogleSheets
 
@@ -105,17 +98,10 @@ def test_google_sheets_add_and_get_entries(settings_mock, authorize_mock, creds_
     assert "c2" in contents
 
 
-@patch("google.oauth2.service_account.Credentials")
-@patch("gspread.authorize")
-@patch("apps.backend.db.google_catalogue.settings")
-def test_google_catalogue_crud(settings_mock, authorize_mock, creds_mock, tmp_path):
-    (tmp_path / "creds.json").write_text("{}")
-    settings_mock.credentials_path = tmp_path / "creds.json"
-    settings_mock.spreadsheet_id = "test-id"
+@patch("apps.backend.db.google_client.get_or_create_spreadsheet")
+def test_google_catalogue_crud(get_spreadsheet_mock, tmp_path):
     spread = _mock_spreadsheet()
-    client_mock = MagicMock()
-    client_mock.open_by_key.return_value = spread
-    authorize_mock.return_value = client_mock
+    get_spreadsheet_mock.return_value = spread
 
     from apps.backend.db.google_catalogue import GoogleCatalogue
 
@@ -145,19 +131,21 @@ def test_google_catalogue_crud(settings_mock, authorize_mock, creds_mock, tmp_pa
     assert got3 is None
 
 
-@patch("apps.backend.db.google_catalogue.settings")
+@patch("apps.backend.db.google_client.settings")
 def test_google_catalogue_raises_when_creds_missing(settings_mock):
     settings_mock.credentials_path = None
     settings_mock.spreadsheet_id = "id"
     with pytest.raises(ValueError, match="GOOGLE_CREDS_PATH"):
-        from apps.backend.db.google_catalogue import GoogleCatalogue
-        GoogleCatalogue()
+        from apps.backend.db.google_client import get_or_create_spreadsheet
+        get_or_create_spreadsheet()
 
 
-@patch("apps.backend.db.google_catalogue.settings")
-def test_google_catalogue_raises_when_spreadsheet_id_missing(settings_mock, tmp_path):
-    settings_mock.credentials_path = tmp_path
+@patch("apps.backend.db.google_client.get_gspread_client")
+@patch("apps.backend.db.google_client.settings")
+def test_google_catalogue_raises_when_spreadsheet_id_and_name_missing(settings_mock, get_client_mock, tmp_path):
+    get_client_mock.return_value = MagicMock()
     settings_mock.spreadsheet_id = ""
-    with pytest.raises(ValueError, match="SPREADSHEET_ID"):
-        from apps.backend.db.google_catalogue import GoogleCatalogue
-        GoogleCatalogue()
+    settings_mock.google_sheets_spreadsheet_name = ""
+    with pytest.raises(ValueError, match="SPREADSHEET_ID or GOOGLE_SHEETS_SPREADSHEET_NAME"):
+        from apps.backend.db.google_client import get_or_create_spreadsheet
+        get_or_create_spreadsheet()
