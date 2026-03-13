@@ -5,7 +5,7 @@
 **Public IP:** `54.165.94.30`  
 **Region:** us-east-1  
 
-Port **22** (SSH) and **8000** (backend) are open.
+Port **22** (SSH), **8000** (backend), **80** (HTTP), and **443** (HTTPS) must be open for Caddy. In AWS Console: EC2 → Security Groups → select the instance’s group → Edit inbound rules → Add 80 and 443 from 0.0.0.0/0 (or your IP).
 
 This instance has **no key pair** in the launch config. Use **EC2 Instance Connect** in the AWS Console (Connect → EC2 Instance Connect) to get a browser shell, or attach a key and use SSH.
 
@@ -63,13 +63,13 @@ sudo systemctl status alldoing
 curl -s http://localhost:8000/health
 ```
 
-From your machine:
+From your machine (after opening ports 80/443):
 
 ```bash
-curl -s http://54.165.94.30:8000/health
+curl -s https://54-165-94-30.sslip.io/health
 ```
 
-Should return `{"status":"ok"}`.
+Should return `{"status":"ok"}`. Frontend should use `BACKEND_URL=https://54-165-94-30.sslip.io`.
 
 ---
 
