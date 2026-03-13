@@ -85,9 +85,9 @@ Optional for local GGUF: `MODEL_PATH` — path to a local model file when using 
 
 ## Before deploying (frontend + backend)
 
-**Frontend** (`apps/frontend/index.html`): Uncomment and set before going live:
+**Frontend** (`apps/frontend/index.html`): Set before going live:
 - `window.BACKEND_URL` — your backend host (e.g. EC2 or Render URL).
-- `window.GOOGLE_CLIENT_ID` — Google OAuth client ID registered for your GitHub Pages domain.
+- `window.GOOGLE_CLIENT_ID` — Google OAuth client ID; see [docs/deployment/google-oauth-github-pages.md](docs/deployment/google-oauth-github-pages.md) (fixes “Error 401: invalid_client”).
 
 The dev bypass button is shown only on localhost; it is hidden in production.
 

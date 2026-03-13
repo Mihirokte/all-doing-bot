@@ -5,7 +5,13 @@
 **Public IP:** `54.165.94.30`  
 **Region:** us-east-1  
 
-Port **22** (SSH), **8000** (backend), **80** (HTTP), and **443** (HTTPS) must be open for Caddy. In AWS Console: EC2 → Security Groups → select the instance’s group → Edit inbound rules → Add 80 and 443 from 0.0.0.0/0 (or your IP).
+**Security group:** `launch-wizard-1` (ID: `sg-044282bf7d0c0d286`). Ports **22** (SSH) and **8000** are already open. You must **add 80 and 443** for Caddy/HTTPS:
+
+1. AWS Console → **EC2** → **Security Groups** → open **launch-wizard-1** (`sg-044282bf7d0c0d286`).
+2. **Edit inbound rules** → **Add rule**:
+   - Type: **HTTP**, Port: **80**, Source: **0.0.0.0/0** (or “Anywhere-IPv4”).
+   - **Add rule** again: Type: **HTTPS**, Port: **443**, Source: **0.0.0.0/0**.
+3. **Save rules**. After a few seconds, `https://54-165-94-30.sslip.io/health` will be reachable.
 
 This instance has **no key pair** in the launch config. Use **EC2 Instance Connect** in the AWS Console (Connect → EC2 Instance Connect) to get a browser shell, or attach a key and use SSH.
 
