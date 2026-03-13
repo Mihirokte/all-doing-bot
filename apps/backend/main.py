@@ -98,6 +98,41 @@ def _chat_looks_like_search(query: str) -> bool:
     return any(t in lower for t in triggers)
 
 
+def _search_response_from_entries(query: str, entries: list) -> str:
+    """Return direct, concrete search results for chat (no abstraction)."""
+    lines = [f"Here are the top results for '{query}':"]
+    rank = 1
+    for e in entries[:5]:
+        content = (getattr(e, "content", "") or "").strip()
+        source = (getattr(e, "source", "") or "").strip()
+        if not content:
+            continue
+        title = content
+        snippet = ""
+        if content.startswith("**") and "**" in content[2:]:
+            # content format from WebSearchAction: **title**\n\nsnippet
+            end = content.find("**", 2)
+            title = content[2:end].strip() or title
+            rest = content[end + 2 :].strip()
+            if rest.startswith("\n\n"):
+                rest = rest[2:].strip()
+            snippet = rest
+        snippet = snippet or content
+        snippet = " ".join(snippet.split())
+        if len(snippet) > 180:
+            snippet = snippet[:180].rstrip() + "..."
+        line = f"{rank}. {title}"
+        if source:
+            line += f" - {source}"
+        if snippet:
+            line += f"\n   {snippet}"
+        lines.append(line)
+        rank += 1
+    if rank == 1:
+        return "I couldn't find concrete web results right now. Please try rephrasing the query."
+    return "\n".join(lines)
+
+
 @app.get("/chat")
 async def chat(q: str = "") -> dict[str, str]:
     """
@@ -111,27 +146,16 @@ async def chat(q: str = "") -> dict[str, str]:
     from apps.backend.llm.engine import get_llm
 
     query = q.strip()
-    context = ""
     if _chat_looks_like_search(query):
         try:
             entries = await run_action("search_web", {"q": query, "top_n": 5})
             if entries:
-                parts = []
-                for e in entries[:5]:
-                    if e.content:
-                        src = (e.source or "").strip()
-                        snippet = (e.content[:400] + "...") if len(e.content) > 400 else e.content
-                        parts.append(snippet + (f" [Source: {src}]" if src else ""))
-                if parts:
-                    context = "Use the following search results to answer. Do not invent facts.\n\n" + "\n\n---\n\n".join(parts) + "\n\n"
+                return {"response": _search_response_from_entries(query, entries)}
         except Exception as e:
             logger.warning("Chat web search failed (continuing without): %s", e)
 
     llm = get_llm()
-    if context:
-        prompt = f"{context}Question: {query}\n\nAnswer in 2-4 sentences based on the results above. Do not use markdown or bullet points."
-    else:
-        prompt = f"Answer concisely in 2-3 sentences. Do not use markdown or bullet points. Question: {query}"
+    prompt = f"Answer concisely in 2-3 sentences. Do not use markdown or bullet points. Question: {query}"
     try:
         response = await llm.generate(prompt, max_tokens=200, json_mode=False)
         return {"response": (response or "").strip()}
