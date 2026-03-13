@@ -118,8 +118,9 @@ class OllamaProvider(LLMProvider):
         base = settings.ollama_base_url.rstrip("/")
         url = f"{base}/v1/chat/completions"
         # Use a generous token budget: thinking models (qwen3.5) emit reasoning tokens
-        # before the actual answer, so 256 is far too small.
-        effective_max_tokens = max(max_tokens, 2048)
+        # before the actual answer, so 256 is far too small.  Cap at 1024 to keep
+        # latency reasonable on CPU-only instances.
+        effective_max_tokens = max(max_tokens, 1024)
         payload = {
             "model": settings.ollama_model,
             "messages": [{"role": "user", "content": prompt}],
@@ -127,7 +128,7 @@ class OllamaProvider(LLMProvider):
             "max_tokens": effective_max_tokens,
             "stream": False,
         }
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=300.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
