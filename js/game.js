@@ -8,11 +8,11 @@ const gameConfig = {
     parent: 'game-container',
     width: 1000,
     height: 700,
-    pixelArt: false, // High fidelity for 64-bit
+    pixelArt: false,
     backgroundColor: '#000000',
     scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH
+        autoCenter: Phaser.Scale.NO_CENTER  // canvas anchors at 0,0 — keeps HTML UI layer aligned
     },
     scene: {
         preload: preload,
@@ -21,7 +21,14 @@ const gameConfig = {
     }
 };
 
-const game = new Phaser.Game(gameConfig);
+// Game is NOT created here — initGame() is called by auth.js after the
+// container is visible so Phaser can measure real dimensions.
+let game = null;
+
+function initGame() {
+    if (game) return;
+    game = new Phaser.Game(gameConfig);
+}
 
 let statusText;
 let terminalSprite;
@@ -43,21 +50,22 @@ window.gameInterface = {
         points += amount;
         if(pointsText) {
             pointsText.setText("CREDITS: " + String(points).padStart(7, '0'));
-            game.scene.scenes[0].tweens.add({
-                targets: pointsText,
-                alpha: 0.5,
-                yoyo: true,
-                duration: 50,
-                repeat: 3
-            });
+            if (game) {
+                game.scene.scenes[0].tweens.add({
+                    targets: pointsText,
+                    alpha: 0.5,
+                    yoyo: true,
+                    duration: 50,
+                    repeat: 3
+                });
+            }
         }
     },
+    // Called by create() once the scene is ready — boot flash + radar
     systemUnlock: function() {
-        // Called when Google auth passes. Boot up the system visually.
-        const scene = game.scene.scenes[0];
+        const scene = game && game.scene.scenes[0];
         if(!scene) return;
-        
-        // Boot sequence flash
+
         const flash = scene.add.rectangle(500, 350, 1000, 700, 0xffffff);
         flash.setDepth(100);
         scene.tweens.add({
@@ -68,7 +76,6 @@ window.gameInterface = {
             onComplete: () => flash.destroy()
         });
 
-        // Start radar sweep
         scene.tweens.add({
             targets: radarSweep,
             angle: 360,
@@ -201,6 +208,9 @@ function create() {
         },
         loop: true
     });
+
+    // Boot animation — runs immediately since the game only starts after login
+    window.gameInterface.systemUnlock();
 }
 
 function createAnalogPanel(scene, x, y, textStr, callback) {
