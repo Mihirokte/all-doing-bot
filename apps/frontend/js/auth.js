@@ -75,11 +75,16 @@ function initGoogleAuth() {
 function unlockSystem() {
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('game-container').style.display = 'block';
-    
-    // Notify the game that systems are active
-    if (window.gameInterface && window.gameInterface.systemUnlock) {
-        window.gameInterface.systemUnlock();
-    }
+
+    // Wait two animation frames so the container is painted and has real
+    // dimensions before Phaser's scale manager measures it.
+    requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+            if (typeof initGame === 'function') initGame();
+        });
+    });
+    // Note: window.gameInterface.systemUnlock() is called at the end of
+    // Phaser's create() once the scene is fully built.
 }
 
 // Optional: call from console or a "Sign out" button to clear saved login and reload

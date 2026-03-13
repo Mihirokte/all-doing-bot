@@ -72,33 +72,34 @@ body {
 
 #game-container {
   position: relative;
-  width: 100%;
-  height: 100%;
-  max-width: 1200px;
-  max-height: 800px;
+  /* Fit the 1000×700 (10:7) canvas into the viewport with no letterbox gap.
+     Width is the smaller of: full viewport width, or the width that fills 100vh at 10:7. */
+  width: min(100vw, calc(100vh * 10 / 7));
+  aspect-ratio: 10 / 7;
+  max-width: 1000px;
+  overflow: hidden;
   box-shadow: 0 0 40px rgba(0, 200, 255, 0.2);
-  /* pixelated off for 64-bit high fidelity */
 }
 
 canvas {
   display: block;
 }
 
-/* CRT Scanline Overlay over the entire game container */
+/* CRT Scanline Overlay — stays within the game container */
 #game-container::after {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   background: linear-gradient(
     rgba(18, 16, 16, 0) 50%, 
     rgba(0, 0, 0, 0.25) 50%
   );
   background-size: 100% 4px;
   pointer-events: none;
-  z-index: 50; /* over the game, but under raw popups if carefully placed */
+  z-index: 50;
 }
 
 .hidden-inputs {
