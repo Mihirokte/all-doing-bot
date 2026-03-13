@@ -117,9 +117,8 @@ class OllamaProvider(LLMProvider):
     async def generate(self, prompt: str, max_tokens: int = 256, json_mode: bool = True) -> str:
         base = settings.ollama_base_url.rstrip("/")
         url = f"{base}/v1/chat/completions"
-        # Disable thinking mode on qwen3.x models (think:false skips the internal
-        # reasoning pass, cutting latency from minutes to seconds on CPU instances).
-        # Keep a 512-token budget — enough for structured JSON intent extraction.
+        # Use 512 tokens max — enough for structured JSON extraction.
+        # A small model (qwen2.5:0.5b) generates this in ~15s on CPU.
         effective_max_tokens = max(max_tokens, 512)
         payload = {
             "model": settings.ollama_model,
@@ -127,9 +126,8 @@ class OllamaProvider(LLMProvider):
             "temperature": 0.1,
             "max_tokens": effective_max_tokens,
             "stream": False,
-            "think": False,
         }
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=90.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
