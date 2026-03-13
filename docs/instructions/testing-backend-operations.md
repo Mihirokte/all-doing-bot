@@ -97,6 +97,18 @@ curl -s "$BASE/cohort/demo"
 
 ---
 
+## Task result diagnostics
+
+When a task completes, `result.raw` may contain per-step diagnostics:
+
+```json
+{ "steps": [ { "action": "search_web", "entry_count": 5 }, { "action": "transform", "entry_count": 2 } ] }
+```
+
+Use this to verify which actions ran and how many entries each produced.
+
+---
+
 ## Unit tests
 
 From the repo root:
@@ -105,4 +117,4 @@ From the repo root:
 python -m pytest tests -q
 ```
 
-Covers pipeline, LLM (mock), actions, config, and Google persistence (mocked where needed).
+Covers pipeline, executor guardrails, multi-step diagnostics, LLM (mock), actions (including web_search/web_fetch), config, and Google persistence (mocked where needed).

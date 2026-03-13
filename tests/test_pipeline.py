@@ -44,6 +44,10 @@ def test_status_returns_processing_then_completed() -> None:
     assert d["status"] == "completed"
     assert "result" in d
     assert d["result"].get("message") or d["result"].get("raw")
+    # Executor records per-step diagnostics in result.raw
+    if d["result"].get("raw") and "steps" in d["result"]["raw"]:
+        assert isinstance(d["result"]["raw"]["steps"], list)
+        assert len(d["result"]["raw"]["steps"]) >= 1
 
 
 def test_status_404_for_unknown_task() -> None:

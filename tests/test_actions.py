@@ -1,4 +1,4 @@
-"""Tests for api_call and transform actions with mocked HTTP."""
+"""Tests for api_call, transform, web_search, and web_fetch actions with mocked HTTP."""
 from __future__ import annotations
 
 import asyncio
@@ -9,6 +9,8 @@ from httpx import Response
 
 from apps.backend.actions.api_call import ApiCallAction
 from apps.backend.actions.transform import TransformAction
+from apps.backend.actions.web_fetch import WebFetchAction
+from apps.backend.actions.web_search import WebSearchAction
 
 
 @respx.mock
@@ -81,3 +83,53 @@ def test_transform_requires_input() -> None:
     action = TransformAction()
     with pytest.raises(ValueError, match="input"):
         asyncio.run(action.execute({}))
+
+
+# --- Web search ---
+
+
+def test_web_search_no_query_returns_stub() -> None:
+    action = WebSearchAction()
+    entries = asyncio.run(action.execute({}))
+    assert len(entries) == 1
+    assert "No search query" in entries[0].content or "q" in entries[0].content.lower()
+
+
+@respx.mock
+def test_web_search_with_q_returns_entries_from_searxng() -> None:
+    from apps.backend.config import settings
+
+    base = settings.searxng_base_url.rstrip("/")
+    respx.get(f"{base}/search").mock(
+        return_value=Response(
+            200,
+            json={
+                "results": [
+                    {"title": "First", "url": "https://a.com/1", "content": "Snippet one"},
+                    {"title": "Second", "url": "https://b.com/2", "content": "Snippet two"},
+                ]
+            },
+        )
+    )
+    action = WebSearchAction()
+    entries = asyncio.run(action.execute({"q": "python news"}))
+    assert len(entries) >= 2
+    assert "First" in entries[0].content or "Snippet one" in entries[0].content
+    assert entries[0].source == "https://a.com/1"
+
+
+# --- Web fetch ---
+
+
+def test_web_fetch_no_urls_returns_stub() -> None:
+    action = WebFetchAction()
+    entries = asyncio.run(action.execute({}))
+    assert len(entries) == 1
+    assert "No URLs" in entries[0].content or "web_fetch stub" in entries[0].content
+
+
+def test_web_fetch_empty_urls_list_returns_stub() -> None:
+    action = WebFetchAction()
+    entries = asyncio.run(action.execute({"urls": []}))
+    assert len(entries) == 1
+    assert "No URLs" in entries[0].content or "stub" in entries[0].content.lower()

@@ -55,3 +55,9 @@ The backend is OpenAI-compatible. To use another provider, set in `.env`:
 - `REMOTE_LLM_API_KEY` = that provider’s API key
 
 Then restart `alldoing`.
+
+## Optional: quality and web search
+
+- **Ollama on EC2:** Set `OLLAMA_BASE_URL` and `OLLAMA_MODEL` and put `ollama` first in `LLM_PROVIDER_PRIORITY` for local inference. Ensure enough disk and RAM (see deployment docs).
+- **SearXNG:** Set `SEARXNG_BASE_URL` to your SearXNG instance so “search the web” queries return real results.
+- **Cloudflare Browser Rendering:** Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` (token with “Browser Rendering - Edit”) to enrich top search results with full-page Markdown and to use bot-friendly fetch for `web_fetch`. See [personal-use-recipes.md](../instructions/personal-use-recipes.md) for quality verification steps.

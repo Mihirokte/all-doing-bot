@@ -1,4 +1,4 @@
-"""Web search action: query SearXNG JSON API, return results as entries."""
+"""Web search action: query SearXNG JSON API, optionally enrich with Cloudflare crawl."""
 from __future__ import annotations
 
 import json
@@ -9,12 +9,14 @@ from typing import Any
 import httpx
 
 from apps.backend.actions.base import BaseAction
+from apps.backend.actions.cloudflare_crawl import _available as cloudflare_available, crawl_urls
 from apps.backend.config import settings
 from apps.backend.db.models import Entry
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_N = 5
+ENRICH_TOP_URLS = 2  # When Cloudflare is set, crawl this many top results for full Markdown
 
 
 def _safe_json_dumps(obj: Any) -> str:
@@ -89,6 +91,45 @@ class WebSearchAction(BaseAction):
                     created_at=now,
                 )
             )
+
+        # Optional: enrich top N URLs with full Markdown via Cloudflare Browser Rendering (partial success, dedupe)
+        sources_seen = {e.source.rstrip("/") for e in entries if e.source}
+        if cloudflare_available() and results:
+            urls_to_crawl = []
+            for item in results[:ENRICH_TOP_URLS]:
+                if isinstance(item, dict):
+                    u = (item.get("url") or "").strip()
+                    if u and u.rstrip("/") not in sources_seen:
+                        urls_to_crawl.append(u)
+            if urls_to_crawl:
+                try:
+                    crawl_records = await crawl_urls(urls_to_crawl, limit_per_url=1, formats=["markdown"], render=False)
+                    for rec in crawl_records:
+                        url_str = rec.get("url") or ""
+                        markdown = (rec.get("markdown") or "").strip()
+                        meta = rec.get("metadata") or {}
+                        title = meta.get("title") if isinstance(meta.get("title"), str) else ""
+                        if not markdown:
+                            continue
+                        url_key = url_str.rstrip("/")
+                        if url_key in sources_seen:
+                            continue
+                        sources_seen.add(url_key)
+                        entries.append(
+                            Entry(
+                                content=markdown[:15000],
+                                source=url_str,
+                                metadata=_safe_json_dumps({
+                                    "title": title,
+                                    "source": meta.get("source", "cloudflare_crawl"),
+                                    "status": meta.get("status", "completed"),
+                                    "url": url_str,
+                                }),
+                                created_at=now,
+                            )
+                        )
+                except Exception as e:
+                    logger.warning("Cloudflare crawl enrich failed (partial results kept): %s", e)
 
         if not entries:
             entries.append(

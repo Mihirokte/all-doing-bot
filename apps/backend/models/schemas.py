@@ -21,7 +21,7 @@ class TaskResult(BaseModel):
     entries_added: Optional[int] = None
     message: Optional[str] = None
     error: Optional[str] = None
-    raw: Optional[Dict[str, Any]] = None
+    raw: Optional[Dict[str, Any]] = None  # e.g. {"steps": [{"action": "...", "entry_count": N, "error": "..."}]}
 
 
 class TaskStatusResponse(BaseModel):

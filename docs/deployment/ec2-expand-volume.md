@@ -1,6 +1,6 @@
 # Expand EBS Volume on EC2
 
-For Ollama + Qwen3.5 and SearXNG you need at least 20 GB disk. Default root volume is often 8 GB.
+**Required for Ollama + Qwen3.5 and SearXNG.** The backend and `git pull` need free space; default root volume (8 GB) fills quickly. Use at least 20 GB.
 
 ## 1. Resize the volume in AWS
 

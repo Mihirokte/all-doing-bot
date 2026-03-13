@@ -34,6 +34,9 @@ class Settings(BaseSettings):
     remote_llm_model: str = "llama-3.1-8b-instant"
     # SearXNG (web search, optional)
     searxng_base_url: str = "http://localhost:8888"
+    # Cloudflare Browser Rendering (optional): crawl URLs for full Markdown. When set, used to enrich search or fetch.
+    cloudflare_account_id: str = ""
+    cloudflare_api_token: str = ""
 
     # Extractor / site adapter settings
     nitter_instances: List[str] = Field(
