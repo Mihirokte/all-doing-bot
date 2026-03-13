@@ -141,7 +141,7 @@ async def chat(q: str = "") -> dict[str, str]:
 
 
 @app.post("/admin/clear-data")
-async def clear_data() -> dict[str, int | str]:
+async def clear_data() -> dict:
     """
     Clear past sessions and persisted cohort data.
     - Deletes all cohorts (and backing sheets in Google mode)
