@@ -85,19 +85,55 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _chat_looks_like_search(query: str) -> bool:
+    """True if the short query implies the user wants live web results (find, search, latest, etc.)."""
+    lower = query.strip().lower()
+    if len(lower) < 4:
+        return False
+    triggers = (
+        "find", "search", "look up", "lookup", "get me", "latest", "recent",
+        "what are the", "when did", "who is the", "where can i", "how do i",
+        "news about", "updates on", "launches", "release",
+    )
+    return any(t in lower for t in triggers)
+
+
 @app.get("/chat")
 async def chat(q: str = "") -> dict[str, str]:
     """
-    Short-query path: single LLM call, no cohort, no pipeline.
-    For queries under ~100 chars. Returns plain conversational response.
+    Short-query path: single LLM call, no cohort.
+    If the query looks like search intent (find, latest, search...), run web search
+    first and feed snippets to the LLM so the answer uses real results.
     """
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+    from apps.backend.actions.registry import run_action
     from apps.backend.llm.engine import get_llm
+
+    query = q.strip()
+    context = ""
+    if _chat_looks_like_search(query):
+        try:
+            entries = await run_action("search_web", {"q": query, "top_n": 5})
+            if entries:
+                parts = []
+                for e in entries[:5]:
+                    if e.content:
+                        src = (e.source or "").strip()
+                        snippet = (e.content[:400] + "...") if len(e.content) > 400 else e.content
+                        parts.append(snippet + (f" [Source: {src}]" if src else ""))
+                if parts:
+                    context = "Use the following search results to answer. Do not invent facts.\n\n" + "\n\n---\n\n".join(parts) + "\n\n"
+        except Exception as e:
+            logger.warning("Chat web search failed (continuing without): %s", e)
+
     llm = get_llm()
-    prompt = f"Answer concisely in 2-3 sentences. Do not use markdown or bullet points. Question: {q.strip()}"
+    if context:
+        prompt = f"{context}Question: {query}\n\nAnswer in 2-4 sentences based on the results above. Do not use markdown or bullet points."
+    else:
+        prompt = f"Answer concisely in 2-3 sentences. Do not use markdown or bullet points. Question: {query}"
     try:
-        response = await llm.generate(prompt, max_tokens=150, json_mode=False)
+        response = await llm.generate(prompt, max_tokens=200, json_mode=False)
         return {"response": (response or "").strip()}
     except Exception as e:
         logger.warning("Chat LLM failed: %s", e)
