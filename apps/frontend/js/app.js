@@ -9,6 +9,7 @@ window.appBoot = function () {
   initClock();
   initQuickTags();
   initQueryBox();
+  initProfile();
   initArchives();
   initSignOut();
   loadCohorts();
@@ -244,6 +245,42 @@ function initArchives() {
   document.getElementById("close-archives").addEventListener("click", () =>
     document.getElementById("archives-overlay").classList.add("hidden")
   );
+}
+
+// ── Profile overlay + data reset ──────────────────────────
+function initProfile() {
+  const openBtn = document.getElementById("profile-toggle");
+  const closeBtn = document.getElementById("close-profile");
+  const overlay = document.getElementById("profile-overlay");
+  const clearBtn = document.getElementById("clear-all-data-btn");
+  const statusEl = document.getElementById("profile-status");
+
+  openBtn.addEventListener("click", () => {
+    statusEl.textContent = "";
+    overlay.classList.remove("hidden");
+  });
+  closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
+
+  clearBtn.addEventListener("click", async () => {
+    const ok = window.confirm("This will delete all past sessions and cohort data. Continue?");
+    if (!ok) return;
+    clearBtn.disabled = true;
+    statusEl.textContent = "Clearing data...";
+    try {
+      const r = await API.clearData();
+      statusEl.textContent = "Done. Deleted cohorts: " + (r.deleted_cohorts || 0) + ", cleared sessions: " + (r.cleared_tasks || 0) + ".";
+      queryCount = 0;
+      document.getElementById("metric-queries").textContent = "0";
+      resetTaskUI();
+      document.getElementById("feed-log").innerHTML =
+        '<div class="msg msg-system" id="boot-msg"><span class="msg-ts" id="boot-ts">' + nowTs() + '</span><span class="msg-body">All history cleared. Ready for a fresh start.</span></div>';
+      await loadCohorts();
+    } catch (e) {
+      statusEl.textContent = "Failed: " + (e.message || e);
+    } finally {
+      clearBtn.disabled = false;
+    }
+  });
 }
 
 async function openArchives(selectedCohort) {

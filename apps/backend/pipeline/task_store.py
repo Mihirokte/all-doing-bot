@@ -107,5 +107,11 @@ class TaskStore:
         if to_drop:
             logger.debug("Cleaned up %d old tasks", len(to_drop))
 
+    def clear_all(self) -> int:
+        """Clear all in-memory task sessions. Returns number removed."""
+        count = len(self._tasks)
+        self._tasks.clear()
+        return count
+
 
 task_store = TaskStore()

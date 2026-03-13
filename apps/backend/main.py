@@ -140,6 +140,32 @@ async def chat(q: str = "") -> dict[str, str]:
         raise HTTPException(status_code=503, detail="LLM unavailable for chat")
 
 
+@app.post("/admin/clear-data")
+async def clear_data() -> dict[str, int | str]:
+    """
+    Clear past sessions and persisted cohort data.
+    - Deletes all cohorts (and backing sheets in Google mode)
+    - Clears in-memory task sessions
+    """
+    from apps.backend.db.catalogue import catalogue
+
+    deleted_cohorts = 0
+    cohorts = await catalogue.list_cohorts()
+    for c in cohorts:
+        try:
+            await catalogue.delete_cohort(c.cohort_name)
+            deleted_cohorts += 1
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Failed deleting cohort %s: %s", c.cohort_name, e)
+
+    cleared_tasks = task_store.clear_all()
+    return {
+        "status": "ok",
+        "deleted_cohorts": deleted_cohorts,
+        "cleared_tasks": cleared_tasks,
+    }
+
+
 @app.get("/query", response_model=QueryAcceptResponse)
 async def submit_query(q: str = "") -> QueryAcceptResponse:
     """
