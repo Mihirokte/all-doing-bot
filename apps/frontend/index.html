@@ -3,83 +3,186 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>All Doing Bot: The Experience</title>
-  
-  <!-- 64-bit Analog Font (VT323 for CRT feel) -->
-  <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
-  
-  <!-- Custom Styles -->
+  <title>ALL-DOING // INTELLIGENCE TERMINAL</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css" />
-  
-  <!-- Phaser 3 -->
-  <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-
-  <!-- Google Auth -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
-  <!-- Hidden inputs to interact with the original logic -->
-  <div class="hidden-inputs">
-    <input type="text" id="query-input" placeholder="Query..." />
-    <button type="button" id="submit-btn">Submit</button>
-  </div>
-
-  <!-- Login Overlay -->
+  <!-- LOGIN SCREEN -->
   <div id="login-overlay">
+    <div class="login-bg-grid"></div>
+    <div class="login-scanlines"></div>
     <div class="login-panel">
-      <h1>[ DEFENSE SYSTEM OFFLINE ]</h1>
-      <p>AUTHENTICATION REQUIRED FOR TERMINAL ACCESS</p>
-      
-      <div id="g_id_onload" style="margin-top: 20px;"></div>
-      
-      <!-- Shown only on localhost; hidden in production (auth.js) -->
-      <button id="dev-bypass-btn" class="analog-btn" style="margin-top:20px;">[ EMERGENCY OVERRIDE (DEV) ]</button>
-    </div>
-  </div>
-
-  <!-- The Phaser Game Container (Hidden until logged in) -->
-  <div id="game-container" style="display: none;">
-    
-    <!-- HTML UI Layer to interact with DOM elements dynamically on top of the canvas -->
-    <div id="html-ui-layer">
-      
-      <!-- Dialogue Box Input -->
-      <div id="dialog-box" class="game-dialog">
-        <label for="game-query-input" style="font-size: 10px; color: #4CAF50; margin-bottom: 5px; display: block;">> SYSTEM COMMAND:</label>
-        <input type="text" id="game-query-input" placeholder="Type a request and press Enter..." autocomplete="off"/>
-      </div>
-      
-  <!-- Data Core Panel -->
-      <div id="archives-panel" class="archives-panel">
-        <div class="close-btn" id="close-archives">[ X CLOSE CONNECTION ]</div>
-        <h2 id="cohort-title">DATA CORE ACCESS</h2>
-        <div class="archives-content">
-          <div id="cohorts-list">Loading…</div>
-          <div id="entries" style="margin-top:20px;"></div>
+      <div class="login-header">
+        <div class="login-tag">SYS://AUTH-GATE v2.6</div>
+        <h1>ALL-DOING<br><span class="login-sub">INTELLIGENCE TERMINAL</span></h1>
+        <div class="login-status-row">
+          <span class="blink-dot"></span>
+          <span class="login-status-text">AWAITING OPERATOR CREDENTIALS</span>
         </div>
       </div>
+      <div class="login-divider"></div>
+      <div id="g_id_onload" class="google-btn-wrapper"></div>
+      <button id="dev-bypass-btn" class="dev-btn">[ DEV OVERRIDE ]</button>
+      <div class="login-footer">
+        <span>CLEARANCE LEVEL: OMEGA</span>
+        <span>ENCRYPTION: AES-512</span>
+        <span>NODE: EC2-US-EAST-1</span>
+      </div>
+    </div>
+  </div>
 
+  <!-- MAIN TERMINAL (hidden until auth) -->
+  <div id="terminal-root" style="display:none">
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <span class="top-logo">ALL-DOING</span>
+        <span class="top-divider">|</span>
+        <span class="top-tag">INTEL TERMINAL</span>
+      </div>
+      <div class="top-bar-center">
+        <span class="sys-node">NODE: EC2-US-EAST-1</span>
+        <span class="sys-sep">·</span>
+        <span id="sys-time" class="sys-time"></span>
+        <span class="sys-sep">·</span>
+        <span id="sys-status" class="sys-status online">ONLINE</span>
+      </div>
+      <div class="top-bar-right">
+        <button class="icon-btn" id="archives-toggle" title="Data Archives">⬡ ARCHIVES</button>
+        <button class="icon-btn danger" id="signout-btn" title="Sign Out">⏻ EXIT</button>
+      </div>
+    </header>
+
+    <!-- MAIN LAYOUT -->
+    <main class="main-layout">
+
+      <!-- LEFT COLUMN: FEED + QUERY -->
+      <section class="col-feed">
+
+        <!-- Query terminal -->
+        <div class="query-box">
+          <div class="query-label">
+            <span class="prompt-arrow">▶</span> SYSTEM COMMAND
+            <span class="query-hint">[ENTER to execute]</span>
+          </div>
+          <div class="query-input-row">
+            <span class="query-prefix">$&gt;</span>
+            <input type="text" id="main-query" placeholder="search web, analyze data, fetch intel..." autocomplete="off" spellcheck="false" />
+            <button id="exec-btn" class="exec-btn">EXEC</button>
+          </div>
+          <div class="query-examples">
+            <span class="ex-label">QUICK:</span>
+            <span class="ex-tag" data-q="search for latest AI news">AI NEWS</span>
+            <span class="ex-tag" data-q="find trending Python frameworks 2026">PYTHON TRENDS</span>
+            <span class="ex-tag" data-q="fetch top GitHub projects today">GITHUB TODAY</span>
+          </div>
+        </div>
+
+        <!-- Live feed log -->
+        <div class="feed-box">
+          <div class="feed-header">
+            <span class="feed-title">MISSION LOG</span>
+            <span id="task-badge" class="task-badge hidden">TASK RUNNING</span>
+            <button class="clear-btn" id="clear-log">CLR</button>
+          </div>
+          <div id="feed-log" class="feed-log">
+            <div class="log-entry system">
+              <span class="log-ts" id="boot-ts"></span>
+              <span class="log-msg">SYSTEM READY. ENTER A COMMAND TO BEGIN.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result panel -->
+        <div id="result-panel" class="result-panel hidden">
+          <div class="result-header">
+            <span class="result-title">▸ INTEL RESULT</span>
+            <button class="result-close" id="close-result">✕</button>
+          </div>
+          <div id="result-content" class="result-content"></div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN: STATUS + COHORTS -->
+      <aside class="col-aside">
+
+        <!-- Task status -->
+        <div class="status-card">
+          <div class="card-label">CURRENT TASK</div>
+          <div id="task-status" class="task-status idle">IDLE</div>
+          <div id="task-query-display" class="task-query-display"></div>
+          <div class="progress-bar-wrap hidden" id="progress-wrap">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div id="task-id-display" class="task-id-display"></div>
+        </div>
+
+        <!-- Cohorts sidebar -->
+        <div class="cohorts-card">
+          <div class="card-label">DATA ARCHIVES
+            <span class="cohort-count" id="cohort-count">0</span>
+          </div>
+          <div id="cohorts-list" class="cohorts-list">
+            <div class="cohorts-empty">No archives yet.</div>
+          </div>
+        </div>
+
+        <!-- System metrics -->
+        <div class="metrics-card">
+          <div class="card-label">SYSTEM METRICS</div>
+          <div class="metric-row">
+            <span class="metric-name">LLM ENGINE</span>
+            <span class="metric-val" id="metric-llm">qwen3.5:4b</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">WEB SEARCH</span>
+            <span class="metric-val online">SearXNG ACTIVE</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">BACKEND</span>
+            <span class="metric-val" id="metric-backend">checking…</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">QUERIES RUN</span>
+            <span class="metric-val" id="metric-queries">0</span>
+          </div>
+        </div>
+
+      </aside>
+    </main>
+
+    <!-- ARCHIVES OVERLAY -->
+    <div id="archives-overlay" class="archives-overlay hidden">
+      <div class="archives-panel">
+        <div class="archives-header">
+          <span class="archives-title">DATA ARCHIVES // COHORT BROWSER</span>
+          <button class="archives-close" id="close-archives">✕ CLOSE</button>
+        </div>
+        <div class="archives-body">
+          <div id="archives-cohorts" class="archives-cohorts"></div>
+          <div id="archives-entries" class="archives-entries">
+            <div class="entries-placeholder">SELECT A COHORT TO VIEW ENTRIES</div>
+          </div>
+        </div>
+      </div>
     </div>
 
-  </div> <!-- End game-container -->
+  </div><!-- end #terminal-root -->
 
-  <!-- Production: set these before config/auth. See docs/deployment/google-oauth-github-pages.md for OAuth. -->
+  <!-- Config + wiring -->
   <script>window.BACKEND_URL = "https://54-165-94-30.sslip.io";</script>
-  <!-- Replace with your Web application Client ID from Google Cloud Console (Authorized origin: https://mihirokte.github.io) -->
   <script>window.GOOGLE_CLIENT_ID = "455801119193-lb6dehdta0ctc701gqnflgq8mtti81ct.apps.googleusercontent.com";</script>
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
-  <script src="js/game.js"></script>
-  <script src="js/app.js"></script>
-  
-  <!-- Auth Logic -->
   <script src="js/auth.js"></script>
-
+  <script src="js/app.js"></script>
   <script>
-    window.onload = function () {
-      initGoogleAuth();
-    };
+    window.onload = function () { initGoogleAuth(); };
   </script>
 </body>
 </html>
