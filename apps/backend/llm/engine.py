@@ -117,13 +117,17 @@ class OllamaProvider(LLMProvider):
     async def generate(self, prompt: str, max_tokens: int = 256, json_mode: bool = True) -> str:
         base = settings.ollama_base_url.rstrip("/")
         url = f"{base}/v1/chat/completions"
+        # Use a generous token budget: thinking models (qwen3.5) emit reasoning tokens
+        # before the actual answer, so 256 is far too small.
+        effective_max_tokens = max(max_tokens, 2048)
         payload = {
             "model": settings.ollama_model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.1,
-            "max_tokens": max_tokens,
+            "max_tokens": effective_max_tokens,
+            "stream": False,
         }
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=120.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
@@ -133,7 +137,11 @@ class OllamaProvider(LLMProvider):
         msg = choices[0].get("message") if isinstance(choices[0], dict) else None
         if not isinstance(msg, dict):
             raise RuntimeError("Ollama response 'choices[0].message' is missing")
-        return (msg.get("content") or "").strip()
+        content = (msg.get("content") or "").strip()
+        # For thinking models, fall back to reasoning field if content is empty
+        if not content:
+            content = (msg.get("reasoning") or "").strip()
+        return content
 
 
 class RemoteProvider(LLMProvider):
