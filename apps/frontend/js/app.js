@@ -1,7 +1,8 @@
-/** ALL-DOING Intelligence Terminal — main application logic */
+/** ALL-DOING Intelligence Terminal — chat-style UI, smart routing by length */
 
+const CHAT_THRESHOLD = 100; // under this many chars: /chat (instant). else: /query (pipeline)
 let queryCount = 0;
-let pollTimer  = null;
+let pollTimer = null;
 
 // ── Boot ─────────────────────────────────────────────────
 window.appBoot = function () {
@@ -12,7 +13,6 @@ window.appBoot = function () {
   initSignOut();
   loadCohorts();
   checkBackend();
-  logEntry("system", "TERMINAL ONLINE. OPERATOR ACCESS GRANTED.");
   document.getElementById("boot-ts").textContent = nowTs();
 };
 
@@ -37,11 +37,10 @@ function initQuickTags() {
   });
 }
 
-// ── Query box ─────────────────────────────────────────────
+// ── Query box: auto-clear on submit, smart routing ──────────
 function initQueryBox() {
-  const input   = document.getElementById("main-query");
+  const input = document.getElementById("main-query");
   const execBtn = document.getElementById("exec-btn");
-
   execBtn.addEventListener("click", () => submitQuery());
   input.addEventListener("keydown", e => {
     if (e.key === "Enter") submitQuery();
@@ -49,31 +48,49 @@ function initQueryBox() {
 }
 
 async function submitQuery() {
-  const input   = document.getElementById("main-query");
+  const input = document.getElementById("main-query");
   const execBtn = document.getElementById("exec-btn");
   const q = input.value.trim();
   if (!q) return;
 
+  // Auto-clear input immediately after submit
+  input.value = "";
   execBtn.disabled = true;
-  input.disabled   = true;
+  input.disabled = true;
+
+  appendMsg("user", q);
+
+  if (q.length < CHAT_THRESHOLD) {
+    // Short path: /chat — one LLM call, no cohort
+    setTaskStatus("RUNNING", q);
+    showTaskBadge(true);
+    try {
+      const data = await API.chat(q);
+      appendMsg("assistant", (data.response || "").trim() || "No response.");
+      setTaskStatus("COMPLETED", q);
+    } catch (e) {
+      appendMsg("assistant", "Error: " + (e.message || e), true);
+      setTaskStatus("IDLE", "");
+    }
+    showTaskBadge(false);
+    execBtn.disabled = false;
+    input.disabled = false;
+    return;
+  }
+
+  // Long path: /query — pipeline, cohort, poll
   setTaskStatus("RUNNING", q);
   showProgressBar(true);
   showTaskBadge(true);
-  closeResult();
-
-  logEntry("submit", "EXECUTING: " + q);
-
   try {
     const { task_id } = await API.submitQuery(q);
-    logEntry("info", "TASK ACCEPTED · ID: " + task_id.slice(0, 8) + "...");
-    document.getElementById("task-id-display").textContent =
-      "TASK ID: " + task_id;
+    document.getElementById("task-id-display").textContent = "TASK ID: " + task_id;
     startPoll(task_id);
   } catch (e) {
-    logEntry("error", "SUBMIT FAILED: " + (e.message || e));
+    appendMsg("result", "Submit failed: " + (e.message || e), true);
     resetTaskUI();
     execBtn.disabled = false;
-    input.disabled   = false;
+    input.disabled = false;
   }
 }
 
@@ -85,39 +102,92 @@ function startPoll(taskId) {
       const s = d.status;
 
       if (s === "completed") {
-        clearInterval(pollTimer); pollTimer = null;
+        clearInterval(pollTimer);
+        pollTimer = null;
         queryCount++;
         document.getElementById("metric-queries").textContent = queryCount;
         setTaskStatus("COMPLETED", d.query || "");
         showProgressBar(false);
         showTaskBadge(false);
-        logEntry("success", "TASK COMPLETE · " + taskId.slice(0, 8));
-        showResult(d.result);
+        appendMsg("result", formatResult(d.result), false, d.result);
         loadCohorts();
         resetInput();
       } else if (s === "failed") {
-        clearInterval(pollTimer); pollTimer = null;
+        clearInterval(pollTimer);
+        pollTimer = null;
         setTaskStatus("FAILED", d.query || "");
         showProgressBar(false);
         showTaskBadge(false);
-        logEntry("error", "TASK FAILED · " +
-          ((d.result && d.result.error) ? d.result.error : "unknown error"));
+        const err = (d.result && d.result.error) ? d.result.error : "unknown error";
+        appendMsg("result", "Task failed: " + err, true);
         resetInput();
-      } else {
-        logEntry("info", "STATUS: " + s.toUpperCase());
       }
     } catch (e) {
-      logEntry("error", "POLL ERROR: " + (e.message || e));
+      appendMsg("result", "Poll error: " + (e.message || e), true);
     }
   }, 3000);
 }
 
-function resetInput() {
-  const execBtn = document.getElementById("exec-btn");
-  const input   = document.getElementById("main-query");
-  execBtn.disabled = false;
-  input.disabled   = false;
+function formatResult(result) {
+  if (!result) return "No result.";
+  if (result.error) return result.error;
+  const n = result.entries_added != null ? result.entries_added : 0;
+  const name = result.cohort_name || "cohort";
+  let text = "Found " + n + " entries in cohort `" + name + "`. " + (result.message || "");
+  const steps = result.raw && result.raw.steps;
+  if (steps && steps.length) {
+    const parts = steps.map(st => (st.action || "?") + (st.entry_count != null ? " (" + st.entry_count + ")" : ""));
+    text += " Steps: " + parts.join(", ");
+  }
+  return text;
 }
+
+function resetInput() {
+  document.getElementById("exec-btn").disabled = false;
+  document.getElementById("main-query").disabled = false;
+}
+
+// ── Chat message feed ─────────────────────────────────────
+function appendMsg(role, body, isError, resultPayload) {
+  const log = document.getElementById("feed-log");
+  const msg = document.createElement("div");
+  msg.className = "msg msg-" + role + (isError ? " msg-error" : "");
+  const ts = nowTs();
+  let inner = '<span class="msg-ts">' + ts + '</span>';
+  if (role === "result" && resultPayload && (resultPayload.raw || resultPayload.message)) {
+    inner += '<div class="msg-body">' + escHtml(body) + '</div>';
+    if (resultPayload.raw && resultPayload.raw.steps) {
+      inner += '<details class="msg-details"><summary>Details</summary><pre>' + escHtml(JSON.stringify(resultPayload, null, 2)) + '</pre></details>';
+    }
+  } else {
+    inner += '<div class="msg-body">' + escHtml(body) + '</div>';
+  }
+  msg.innerHTML = inner;
+  log.appendChild(msg);
+  log.scrollTop = log.scrollHeight;
+}
+
+function nowTs() {
+  return new Date().toISOString().slice(11, 19);
+}
+
+document.getElementById("clear-log").addEventListener("click", () => {
+  const log = document.getElementById("feed-log");
+  const boot = document.getElementById("boot-msg");
+  log.innerHTML = "";
+  if (boot) {
+    log.appendChild(boot);
+    const tsEl = boot.querySelector("#boot-ts");
+    if (tsEl) tsEl.textContent = nowTs();
+  } else {
+    const sys = document.createElement("div");
+    sys.className = "msg msg-system";
+    sys.id = "boot-msg";
+    sys.innerHTML = '<span class="msg-ts" id="boot-ts">' + nowTs() + '</span><span class="msg-body">Chat cleared.</span>';
+    log.appendChild(sys);
+  }
+  log.scrollTop = log.scrollHeight;
+});
 
 // ── Task status card ──────────────────────────────────────
 function setTaskStatus(state, query) {
@@ -129,8 +199,7 @@ function setTaskStatus(state, query) {
 }
 
 function showProgressBar(show) {
-  const wrap = document.getElementById("progress-wrap");
-  wrap.classList.toggle("hidden", !show);
+  document.getElementById("progress-wrap").classList.toggle("hidden", !show);
 }
 
 function showTaskBadge(show) {
@@ -144,52 +213,9 @@ function resetTaskUI() {
   document.getElementById("task-id-display").textContent = "";
 }
 
-// ── Log feed ──────────────────────────────────────────────
-function logEntry(type, msg) {
-  const log = document.getElementById("feed-log");
-  const row = document.createElement("div");
-  row.className = "log-entry " + type;
-  row.innerHTML =
-    '<span class="log-ts">' + nowTs() + '</span>' +
-    '<span class="log-msg">' + escHtml(msg) + '</span>';
-  log.appendChild(row);
-  log.scrollTop = log.scrollHeight;
-}
-
-function nowTs() {
-  return new Date().toISOString().slice(11, 19);
-}
-
-document.getElementById("clear-log").addEventListener("click", () => {
-  const log = document.getElementById("feed-log");
-  log.innerHTML = "";
-  logEntry("system", "LOG CLEARED.");
-});
-
-// ── Result panel ──────────────────────────────────────────
-function showResult(result) {
-  const panel   = document.getElementById("result-panel");
-  const content = document.getElementById("result-content");
-
-  if (!result) {
-    content.textContent = "No result data.";
-  } else if (typeof result === "string") {
-    content.textContent = result;
-  } else {
-    content.textContent = JSON.stringify(result, null, 2);
-  }
-  panel.classList.remove("hidden");
-}
-
-function closeResult() {
-  document.getElementById("result-panel").classList.add("hidden");
-}
-
-document.getElementById("close-result").addEventListener("click", closeResult);
-
 // ── Cohorts sidebar ───────────────────────────────────────
 async function loadCohorts() {
-  const list  = document.getElementById("cohorts-list");
+  const list = document.getElementById("cohorts-list");
   const count = document.getElementById("cohort-count");
   try {
     const cohorts = await API.listCohorts();
@@ -225,10 +251,8 @@ async function openArchives(selectedCohort) {
   overlay.classList.remove("hidden");
   const cohortsEl = document.getElementById("archives-cohorts");
   const entriesEl = document.getElementById("archives-entries");
-
   cohortsEl.innerHTML = '<div style="color:var(--muted);font-size:12px">Loading…</div>';
   entriesEl.innerHTML = '<div class="entries-placeholder">SELECT A COHORT TO VIEW ENTRIES</div>';
-
   try {
     const cohorts = await API.listCohorts();
     if (!cohorts.length) {
@@ -278,11 +302,9 @@ async function checkBackend() {
     await API.health();
     el.textContent = "CONNECTED";
     el.classList.add("online");
-    logEntry("success", "BACKEND CONNECTED: " + (window.BACKEND_URL || ""));
   } catch (e) {
     el.textContent = "OFFLINE";
     el.style.color = "var(--red)";
-    logEntry("error", "BACKEND UNREACHABLE: " + (e.message || e));
     document.getElementById("sys-status").textContent = "DEGRADED";
     document.getElementById("sys-status").style.color = "var(--amber)";
   }
@@ -306,5 +328,4 @@ function escAttr(s) {
   return String(s).replace(/"/g, "&quot;");
 }
 
-// Expose for outside callers
 window.appRefreshCohorts = loadCohorts;

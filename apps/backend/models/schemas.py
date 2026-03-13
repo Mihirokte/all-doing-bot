@@ -83,6 +83,17 @@ class PlanOutput(BaseModel):
     steps: list[PlanStep] = Field(default_factory=list)  # list[] ok on 3.9
 
 
+class ParseAndPlanOutput(BaseModel):
+    """Combined parse+plan: intent and steps in one LLM call."""
+
+    cohort_name: str
+    cohort_description: str = ""
+    action_type: str = "web_fetch"
+    action_params: Dict[str, Any] = Field(default_factory=dict)
+    summary: str = ""
+    steps: list[PlanStep] = Field(default_factory=list)
+
+
 class ParseResult(ParsedIntent):
     """Explicit parse-stage schema referenced in the planning docs."""
 

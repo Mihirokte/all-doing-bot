@@ -82,28 +82,19 @@
           </div>
         </div>
 
-        <!-- Live feed log -->
-        <div class="feed-box">
+        <!-- Chat thread -->
+        <div class="feed-box chat-feed">
           <div class="feed-header">
-            <span class="feed-title">MISSION LOG</span>
+            <span class="feed-title">CHAT</span>
             <span id="task-badge" class="task-badge hidden">TASK RUNNING</span>
             <button class="clear-btn" id="clear-log">CLR</button>
           </div>
-          <div id="feed-log" class="feed-log">
-            <div class="log-entry system">
-              <span class="log-ts" id="boot-ts"></span>
-              <span class="log-msg">SYSTEM READY. ENTER A COMMAND TO BEGIN.</span>
+          <div id="feed-log" class="feed-log chat-log">
+            <div class="msg msg-system" id="boot-msg">
+              <span class="msg-ts" id="boot-ts"></span>
+              <span class="msg-body">System ready. Short questions get instant replies; longer requests run research and create cohorts.</span>
             </div>
           </div>
-        </div>
-
-        <!-- Result panel -->
-        <div id="result-panel" class="result-panel hidden">
-          <div class="result-header">
-            <span class="result-title">▸ INTEL RESULT</span>
-            <button class="result-close" id="close-result">✕</button>
-          </div>
-          <div id="result-content" class="result-content"></div>
         </div>
 
       </section>

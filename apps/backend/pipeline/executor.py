@@ -10,7 +10,7 @@ from apps.backend.actions.registry import run_action
 from apps.backend.db.catalogue import catalogue
 from apps.backend.db.sheets import add_entries
 from apps.backend.models.schemas import ParsedIntent, PlanOutput, PlanStep, TaskResult
-from apps.backend.pipeline.stages import run_parse, run_plan
+from apps.backend.pipeline.stages import run_parse_and_plan
 from apps.backend.pipeline.task_store import task_store
 
 logger = logging.getLogger(__name__)
@@ -70,12 +70,10 @@ async def run_full_pipeline(task_id: str, query: str) -> None:
     try:
         task_store.set_status(task_id, "processing")
 
-        parsed = await run_parse(query)
+        parsed, plan = await run_parse_and_plan(query)
         if not parsed:
-            task_store.set_failed(task_id, "Parse stage failed: no valid JSON")
+            task_store.set_failed(task_id, "Parse+plan stage failed: no valid JSON")
             return
-
-        plan = await run_plan(parsed)
         all_entries: list = []
         steps_diagnostics: list[dict] = []
 

@@ -85,6 +85,25 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+@app.get("/chat")
+async def chat(q: str = "") -> dict[str, str]:
+    """
+    Short-query path: single LLM call, no cohort, no pipeline.
+    For queries under ~100 chars. Returns plain conversational response.
+    """
+    if not q or not q.strip():
+        raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+    from apps.backend.llm.engine import get_llm
+    llm = get_llm()
+    prompt = f"Answer concisely in 2-3 sentences. Do not use markdown or bullet points. Question: {q.strip()}"
+    try:
+        response = await llm.generate(prompt, max_tokens=150, json_mode=False)
+        return {"response": (response or "").strip()}
+    except Exception as e:
+        logger.warning("Chat LLM failed: %s", e)
+        raise HTTPException(status_code=503, detail="LLM unavailable for chat")
+
+
 @app.get("/query", response_model=QueryAcceptResponse)
 async def submit_query(q: str = "") -> QueryAcceptResponse:
     """
