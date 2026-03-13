@@ -162,6 +162,27 @@ def _crawl_response_from_records(query: str, records: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _fetched_response_from_entries(query: str, entries: list) -> str:
+    """Return concrete summaries from fetched page content."""
+    lines = [f"I opened top links for '{query}' and found:"]
+    rank = 1
+    for e in entries[:4]:
+        content = (getattr(e, "content", "") or "").strip()
+        source = (getattr(e, "source", "") or "").strip()
+        if not content or content.lower().startswith("error:"):
+            continue
+        summary = " ".join(content.split())
+        if len(summary) > 260:
+            summary = summary[:260].rstrip() + "..."
+        label = source or f"Result {rank}"
+        line = f"{rank}. {label}\n   {summary}"
+        lines.append(line)
+        rank += 1
+    if rank == 1:
+        return ""
+    return "\n".join(lines)
+
+
 @app.get("/chat")
 async def chat(q: str = "") -> dict[str, str]:
     """
@@ -193,6 +214,17 @@ async def chat(q: str = "") -> dict[str, str]:
                         crawl_text = _crawl_response_from_records(query, records)
                         if crawl_text:
                             return {"response": crawl_text}
+                # Fallback path: still hit links via web_fetch/extractor if crawl isn't configured or yields nothing.
+                urls = []
+                for e in entries[:5]:
+                    src = (getattr(e, "source", "") or "").strip()
+                    if src and src.startswith("http"):
+                        urls.append(src)
+                if urls:
+                    fetched = await run_action("web_fetch", {"urls": urls[:3]})
+                    fetched_text = _fetched_response_from_entries(query, fetched)
+                    if fetched_text:
+                        return {"response": fetched_text}
                 return {"response": _search_response_from_entries(query, entries)}
         except Exception as e:
             logger.warning("Chat web search failed (continuing without): %s", e)
