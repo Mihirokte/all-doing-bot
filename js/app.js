@@ -11,17 +11,17 @@
   let pollInterval = null;
 
   function setStatus(msg, isError = false) {
-    // Update DOM strictly internally
-    statusEl.textContent = msg;
-    statusEl.className = "status " + (isError ? "error" : "");
-    // Update Phaser Game UI
+    if (statusEl) {
+      statusEl.textContent = msg;
+      statusEl.className = "status " + (isError ? "error" : "");
+    }
     if (window.gameInterface) {
-        window.gameInterface.setStatus(msg, isError);
+      window.gameInterface.setStatus(msg, isError);
     }
   }
 
   function setResult(html) {
-    resultEl.innerHTML = html;
+    if (resultEl) resultEl.innerHTML = html;
   }
 
   async function pollStatus(taskId) {
