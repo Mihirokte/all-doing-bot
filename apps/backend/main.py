@@ -134,6 +134,34 @@ def _search_response_from_entries(query: str, entries: list) -> str:
     return "\n".join(lines)
 
 
+def _crawl_response_from_records(query: str, records: list[dict]) -> str:
+    """Return concrete link-hit results from crawled pages."""
+    lines = [f"I crawled top links for '{query}' and found:"]
+    rank = 1
+    for rec in records[:3]:
+        if not isinstance(rec, dict):
+            continue
+        url = str(rec.get("url") or "").strip()
+        markdown = str(rec.get("markdown") or "").strip()
+        meta = rec.get("metadata") if isinstance(rec.get("metadata"), dict) else {}
+        title = str(meta.get("title") or "").strip() if meta else ""
+        if not markdown:
+            continue
+        summary = " ".join(markdown.split())
+        if len(summary) > 240:
+            summary = summary[:240].rstrip() + "..."
+        label = title or url or f"Result {rank}"
+        line = f"{rank}. {label}"
+        if url:
+            line += f" - {url}"
+        line += f"\n   {summary}"
+        lines.append(line)
+        rank += 1
+    if rank == 1:
+        return ""
+    return "\n".join(lines)
+
+
 @app.get("/chat")
 async def chat(q: str = "") -> dict[str, str]:
     """
@@ -151,6 +179,20 @@ async def chat(q: str = "") -> dict[str, str]:
         try:
             entries = await run_action("search_web", {"q": query, "top_n": 5})
             if entries:
+                # Proper web protocol: hit returned links via Cloudflare crawl when configured.
+                from apps.backend.actions.cloudflare_crawl import _available as crawl_available, crawl_urls
+
+                if crawl_available():
+                    urls = []
+                    for e in entries[:5]:
+                        src = (getattr(e, "source", "") or "").strip()
+                        if src and src.startswith("http"):
+                            urls.append(src)
+                    if urls:
+                        records = await crawl_urls(urls[:3], limit_per_url=1, formats=["markdown"], render=False)
+                        crawl_text = _crawl_response_from_records(query, records)
+                        if crawl_text:
+                            return {"response": crawl_text}
                 return {"response": _search_response_from_entries(query, entries)}
         except Exception as e:
             logger.warning("Chat web search failed (continuing without): %s", e)
