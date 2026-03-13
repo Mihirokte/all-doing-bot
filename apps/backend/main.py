@@ -91,9 +91,10 @@ def _chat_looks_like_search(query: str) -> bool:
     if len(lower) < 4:
         return False
     triggers = (
-        "find", "search", "look up", "lookup", "get me", "latest", "recent",
+        "find", "search", "look up", "lookup", "get me", "fetch",
+        "latest", "recent", "today", "this week", "top", "best", "trending",
         "what are the", "when did", "who is the", "where can i", "how do i",
-        "news about", "updates on", "launches", "release",
+        "news about", "updates on", "launches", "release", "projects", "github",
     )
     return any(t in lower for t in triggers)
 
