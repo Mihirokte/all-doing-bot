@@ -5,6 +5,7 @@
  *   GET /chat?q=...       -> { response: "..." }  (short queries, no cohort)
  *   GET /query?q=...      -> { task_id, status: "accepted" }
  *   GET /status/{task_id} -> { task_id, status, query?, result? }
+ *   POST /admin/clear-data -> { status, deleted_cohorts, cleared_tasks }
  *   GET /cohorts          -> [{ cohort_name, cohort_description, action_type, sheet_name, entry_count, created_at, last_run }]
  *   GET /cohort/{name}    -> [{ entry_id, content, source, metadata, created_at }]
  */
@@ -17,6 +18,12 @@ const API = {
 
   async chat(query) {
     const res = await fetch(`${BACKEND_URL}/chat?q=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async clearData() {
+    const res = await fetch(`${BACKEND_URL}/admin/clear-data`, { method: "POST" });
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },

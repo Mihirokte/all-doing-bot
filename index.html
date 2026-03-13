@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ALL-DOING // INTELLIGENCE TERMINAL</title>
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+  <title>All-Doing Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -52,6 +52,7 @@
         <span id="sys-status" class="sys-status online">ONLINE</span>
       </div>
       <div class="top-bar-right">
+        <button class="icon-btn" id="profile-toggle" title="Profile">PROFILE</button>
         <button class="icon-btn" id="archives-toggle" title="Data Archives">⬡ ARCHIVES</button>
         <button class="icon-btn danger" id="signout-btn" title="Sign Out">⏻ EXIT</button>
       </div>
@@ -146,6 +147,24 @@
 
       </aside>
     </main>
+
+    <!-- PROFILE OVERLAY -->
+    <div id="profile-overlay" class="profile-overlay hidden">
+      <div class="profile-panel">
+        <div class="profile-header">
+          <span class="profile-title">Profile & Data</span>
+          <button class="profile-close" id="close-profile">Close</button>
+        </div>
+        <div class="profile-body">
+          <p class="profile-copy">
+            Clear past sessions and all cohort data stored in Google Sheets (or local fake storage).
+            This action cannot be undone.
+          </p>
+          <button id="clear-all-data-btn" class="danger-action-btn">Clear Past Sessions + Drive Data</button>
+          <div id="profile-status" class="profile-status"></div>
+        </div>
+      </div>
+    </div>
 
     <!-- ARCHIVES OVERLAY -->
     <div id="archives-overlay" class="archives-overlay hidden">
