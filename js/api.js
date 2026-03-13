@@ -2,6 +2,7 @@
  * Backend API client.
  * Endpoints (FastAPI main.py):
  *   GET /health           -> { status: "ok" }
+ *   GET /chat?q=...       -> { response: "..." }  (short queries, no cohort)
  *   GET /query?q=...      -> { task_id, status: "accepted" }
  *   GET /status/{task_id} -> { task_id, status, query?, result? }
  *   GET /cohorts          -> [{ cohort_name, cohort_description, action_type, sheet_name, entry_count, created_at, last_run }]
@@ -10,6 +11,12 @@
 const API = {
   async health() {
     const res = await fetch(`${BACKEND_URL}/health`);
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  },
+
+  async chat(query) {
+    const res = await fetch(`${BACKEND_URL}/chat?q=${encodeURIComponent(query)}`);
     if (!res.ok) throw new Error(await res.text());
     return res.json();
   },
