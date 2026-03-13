@@ -79,6 +79,7 @@ window.gameInterface = {
 };
 
 function preload() {
+    // Optional CRT overlay; if missing (e.g. on GitHub Pages), create() skips it
     this.load.image('crt_overlay', 'assets/game/crt_overlay.png');
 }
 
@@ -170,12 +171,15 @@ function create() {
         wordWrap: { width: 860 }
     });
 
-    // 7. CRT Overlay details (Noise & Vignette)
-    crtOverlay = this.add.image(500, 350, 'crt_overlay');
-    crtOverlay.setAlpha(0.3);
-    crtOverlay.blendMode = Phaser.BlendModes.MULTIPLY;
-    const crtScale = Math.max(scaleX, scaleY);
-    crtOverlay.setScale(crtScale);
+    // 7. CRT Overlay details (Noise & Vignette) - optional if asset missing
+    const scaleX = this.scale.scaleX ?? 1;
+    const scaleY = this.scale.scaleY ?? 1;
+    if (this.textures.exists('crt_overlay')) {
+        crtOverlay = this.add.image(500, 350, 'crt_overlay');
+        crtOverlay.setAlpha(0.3);
+        crtOverlay.blendMode = Phaser.BlendModes.MULTIPLY;
+        crtOverlay.setScale(Math.max(scaleX, scaleY));
+    }
 
     // Close DOM elements if clicking background (Using an invisible zone since we removed the bg image)
     const interactionZone = this.add.zone(500, 350, 1000, 700).setInteractive();
