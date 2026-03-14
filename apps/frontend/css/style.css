@@ -24,11 +24,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body {
-  width: 100%; height: 100%;
+  width: 100%;
+  min-height: 100%;
   background: radial-gradient(1200px 600px at 20% -10%, #e9edff 0%, transparent 60%), var(--bg);
   color: var(--text);
   font-family: var(--font-mono);
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 /* ── SCROLLBAR ──────────────────────────────────────────── */
@@ -167,13 +168,14 @@ html, body {
 /* ── TOP BAR ────────────────────────────────────────────── */
 .top-bar {
   display: flex; align-items: center;
-  height: 44px;
+  min-height: 44px;
   background: rgba(255,255,255,0.78);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
-  padding: 0 20px;
+  padding: 8px 16px;
   flex-shrink: 0;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .top-logo {
@@ -224,13 +226,13 @@ html, body {
 /* ── MAIN LAYOUT ────────────────────────────────────────── */
 #terminal-root {
   display: flex; flex-direction: column;
-  height: 100vh;
+  min-height: 100vh;
 }
 
 .main-layout {
   display: flex;
   flex: 1;
-  overflow: hidden;
+  overflow: auto;
   gap: 0;
 }
 
@@ -480,7 +482,8 @@ html, body {
 
 /* ── RIGHT / ASIDE COLUMN ───────────────────────────────── */
 .col-aside {
-  width: 280px;
+  width: 320px;
+  max-width: 34vw;
   flex-shrink: 0;
   display: flex; flex-direction: column;
   padding: 16px 12px;
@@ -730,6 +733,186 @@ html, body {
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(41, 60, 112, 0.22);
   overflow: hidden;
+}
+
+/* =========================================================
+   Responsive layout
+   ========================================================= */
+@media (max-width: 1100px) {
+  .top-bar {
+    gap: 8px 14px;
+    justify-content: space-between;
+  }
+  .top-bar-center {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+    padding-bottom: 2px;
+  }
+  .main-layout {
+    flex-direction: column;
+  }
+  .col-feed {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    min-height: 58vh;
+  }
+  .col-aside {
+    width: 100%;
+    max-width: 100%;
+    padding: 12px 16px 16px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    overflow: visible;
+  }
+  .status-card,
+  .cohorts-card,
+  .metrics-card {
+    height: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 15px;
+  }
+  .login-panel {
+    min-width: 0;
+    width: min(94vw, 520px);
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+  .login-panel h1 {
+    font-size: 30px;
+    letter-spacing: 2px;
+  }
+  .login-sub {
+    font-size: 14px;
+    letter-spacing: 3px;
+  }
+  .login-footer {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .top-bar {
+    padding: 8px 10px;
+  }
+  .top-logo {
+    font-size: 15px;
+    letter-spacing: 2px;
+  }
+  .top-tag {
+    font-size: 10px;
+    letter-spacing: 2px;
+  }
+  .icon-btn {
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+  }
+  .main-layout {
+    overflow: visible;
+  }
+  .col-feed {
+    padding: 10px;
+    gap: 10px;
+    min-height: 54vh;
+  }
+  .query-box {
+    padding: 12px;
+    border-radius: 12px;
+  }
+  .query-label {
+    font-size: 10px;
+    letter-spacing: 1px;
+  }
+  .query-input-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .query-prefix {
+    font-size: 16px;
+  }
+  #main-query {
+    width: calc(100% - 28px);
+    min-width: 0;
+    font-size: 15px;
+  }
+  .exec-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding: 10px 14px;
+  }
+  .feed-box {
+    border-radius: 12px;
+  }
+  .feed-header {
+    padding: 8px 10px;
+  }
+  .feed-log.chat-log {
+    padding: 10px;
+    gap: 8px;
+  }
+  .msg {
+    max-width: 100%;
+    gap: 6px;
+  }
+  .msg-body {
+    font-size: 14px;
+    line-height: 1.55;
+    padding: 10px 12px;
+  }
+  .msg-ts {
+    font-size: 10px;
+    min-width: 36px;
+  }
+  .col-aside {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+  .status-card,
+  .cohorts-card,
+  .metrics-card {
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .task-status {
+    font-size: 20px;
+    letter-spacing: 2px;
+  }
+  .archives-overlay,
+  .profile-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .archives-panel,
+  .profile-panel {
+    width: 100vw;
+    max-width: 100vw;
+    height: 86vh;
+    border-radius: 16px 16px 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  .archives-header,
+  .profile-header {
+    padding: 12px 14px;
+  }
+  .archives-body {
+    flex-direction: column;
+  }
+  .archives-cohorts {
+    width: 100%;
+    max-height: 34%;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .archives-entries {
+    padding: 10px;
+  }
 }
 
 .profile-header {
