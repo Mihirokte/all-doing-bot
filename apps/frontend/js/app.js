@@ -4,6 +4,8 @@ const CHAT_THRESHOLD = 100; // under this many chars: /chat (instant). else: /qu
 let queryCount = 0;
 let pollTimer = null;
 let thinkingMessageEl = null;
+let thinkingShownAtMs = 0;
+const MIN_THINKING_VISIBLE_MS = 900;
 
 // Short query is "search-like" (mirrors backend) → show deep retrieval status
 function looksLikeSearch(q) {
@@ -79,11 +81,11 @@ async function submitQuery() {
     try {
       const data = await API.chat(q);
       const responseText = (data.response || "").trim() || "No response.";
-      hideThinkingIndicator();
+      await hideThinkingIndicator();
       appendMsg("assistant", responseText, false, null, true);
       setTaskStatus("COMPLETED", q);
     } catch (e) {
-      hideThinkingIndicator();
+      await hideThinkingIndicator();
       appendMsg("assistant", "Error: " + (e.message || e), true);
       setTaskStatus("IDLE", "");
     }
@@ -121,7 +123,7 @@ function startPoll(taskId) {
       if (s === "completed") {
         clearInterval(pollTimer);
         pollTimer = null;
-        hideThinkingIndicator();
+        await hideThinkingIndicator();
         queryCount++;
         document.getElementById("metric-queries").textContent = queryCount;
         setTaskStatus("COMPLETED", d.query || "");
@@ -133,7 +135,7 @@ function startPoll(taskId) {
       } else if (s === "failed") {
         clearInterval(pollTimer);
         pollTimer = null;
-        hideThinkingIndicator();
+        await hideThinkingIndicator();
         setTaskStatus("FAILED", d.query || "");
         showProgressBar(false);
         showTaskBadge(false);
@@ -148,7 +150,7 @@ function startPoll(taskId) {
 }
 
 function showThinkingIndicator(label) {
-  hideThinkingIndicator();
+  clearThinkingIndicatorNow();
   const log = document.getElementById("feed-log");
   const msg = document.createElement("div");
   msg.className = "msg msg-assistant msg-thinking";
@@ -161,13 +163,23 @@ function showThinkingIndicator(label) {
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
   thinkingMessageEl = msg;
+  thinkingShownAtMs = Date.now();
 }
 
-function hideThinkingIndicator() {
+async function hideThinkingIndicator() {
+  const elapsed = Date.now() - thinkingShownAtMs;
+  if (elapsed < MIN_THINKING_VISIBLE_MS) {
+    await new Promise(resolve => setTimeout(resolve, MIN_THINKING_VISIBLE_MS - elapsed));
+  }
+  clearThinkingIndicatorNow();
+}
+
+function clearThinkingIndicatorNow() {
   if (thinkingMessageEl && thinkingMessageEl.parentNode) {
     thinkingMessageEl.parentNode.removeChild(thinkingMessageEl);
   }
   thinkingMessageEl = null;
+  thinkingShownAtMs = 0;
 }
 
 function formatResult(result) {

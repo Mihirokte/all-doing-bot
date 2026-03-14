@@ -4,21 +4,21 @@
    ========================================================= */
 
 :root {
-  --bg:        #eff3f8;
-  --bg2:       #ffffff;
-  --bg3:       #edf2fa;
-  --border:    #cdd8ea;
-  --green:     #21895b;
-  --cyan:      #3856d6;
-  --amber:     #b7791f;
-  --red:       #c63f58;
-  --muted:     #55657d;
-  --text:      #0f172a;
-  --text-dim:  #334155;
+  --bg:        #0a1224;
+  --bg2:       #111c34;
+  --bg3:       #172643;
+  --border:    #25385f;
+  --green:     #22c55e;
+  --cyan:      #60a5fa;
+  --amber:     #f59e0b;
+  --red:       #f43f5e;
+  --muted:     #94a3b8;
+  --text:      #e2e8f0;
+  --text-dim:  #cbd5e1;
   --font-mono: 'DM Sans', sans-serif;
   --font-ui:   'Nunito', sans-serif;
-  --glow-g:    0 4px 18px rgba(59,178,115,0.22);
-  --glow-c:    0 8px 20px rgba(95,111,255,0.20);
+  --glow-g:    0 0 20px rgba(34,197,94,0.35);
+  --glow-c:    0 0 20px rgba(96,165,250,0.35);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -26,7 +26,7 @@
 html, body {
   width: 100%;
   min-height: 100%;
-  background: radial-gradient(1200px 600px at 20% -10%, #e9edff 0%, transparent 60%), var(--bg);
+  background: radial-gradient(1200px 600px at 15% -20%, #1a2d52 0%, transparent 55%), var(--bg);
   color: var(--text);
   font-family: var(--font-mono);
   overflow-x: hidden;
@@ -169,7 +169,7 @@ html, body {
 .top-bar {
   display: flex; align-items: center;
   min-height: 44px;
-  background: rgba(255,255,255,0.78);
+  background: rgba(10,18,36,0.88);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
   padding: 8px 16px;
@@ -184,7 +184,7 @@ html, body {
   font-size: 18px;
   letter-spacing: 4px;
   color: var(--cyan);
-  text-shadow: none;
+  text-shadow: var(--glow-c);
 }
 
 .top-divider { color: var(--muted); margin: 0 4px; }
@@ -211,7 +211,7 @@ html, body {
   font-size: 12px;
   font-weight: 500;
   letter-spacing: 2px;
-  color: #4f5bd5;
+  color: var(--cyan);
   background: transparent;
   border: 1px solid var(--border);
   padding: 6px 14px;
@@ -221,7 +221,7 @@ html, body {
 }
 .icon-btn:hover { border-color: var(--cyan); box-shadow: var(--glow-c); }
 .icon-btn.danger { color: var(--red); }
-.icon-btn.danger:hover { border-color: var(--red); box-shadow: 0 0 8px rgba(255,51,85,0.4); }
+.icon-btn.danger:hover { border-color: var(--red); box-shadow: 0 0 10px rgba(244,63,94,0.45); }
 
 /* ── MAIN LAYOUT ────────────────────────────────────────── */
 #terminal-root {
@@ -253,7 +253,7 @@ html, body {
   border-radius: 14px;
   padding: 14px 18px;
   flex-shrink: 0;
-  box-shadow: 0 0 20px rgba(0,255,136,0.06);
+  box-shadow: 0 14px 30px rgba(0,0,0,0.25);
 }
 
 .query-label {
@@ -295,8 +295,8 @@ html, body {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 3px;
-  color: #fff;
-  background: linear-gradient(90deg, #5f6fff, #7b5cff);
+  color: #0b1020;
+  background: linear-gradient(90deg, #60a5fa, #34d399);
   border: none;
   padding: 8px 20px;
   border-radius: 10px;
@@ -417,17 +417,17 @@ html, body {
   flex-direction: row-reverse;
 }
 .msg-user .msg-body {
-  background: #5f6fff;
-  border: 1px solid #5f6fff;
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(95,111,255,0.25);
+  background: linear-gradient(135deg, #2563eb, #22d3ee);
+  border: 1px solid #38bdf8;
+  color: #f8fafc;
+  box-shadow: 0 8px 18px rgba(56,189,248,0.25);
 }
 
 /* Assistant: left-aligned cyan-tinted bubble */
 .msg-assistant .msg-body {
-  background: #f8fbff;
-  border: 1px solid #c7d6ee;
-  color: #172033;
+  background: #0f1b33;
+  border: 1px solid #29406b;
+  color: #dbeafe;
 }
 .msg-body .msg-evidence-link {
   color: var(--cyan);
@@ -447,7 +447,7 @@ html, body {
 
 /* Result card: left-aligned, cyan border */
 .msg-result .msg-body {
-  background: rgba(0, 212, 255, 0.06);
+  background: rgba(96,165,250,0.12);
   border: 1px solid var(--cyan);
   color: var(--text);
 }
@@ -476,7 +476,7 @@ html, body {
 .msg-system .msg-body {
   background: transparent;
   border: none;
-  color: #3f4f67;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -612,9 +612,10 @@ html, body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: #f4f8ff;
-  border: 1px solid #c3d4f3;
-  color: #22314b;
+  background: #0f1f3d;
+  border: 1px solid #3b82f6;
+  color: #dbeafe;
+  box-shadow: 0 0 16px rgba(59,130,246,0.35);
 }
 
 .thinking-dots {
@@ -624,11 +625,12 @@ html, body {
 }
 
 .thinking-dots span {
-  width: 6px;
-  height: 6px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
-  background: var(--cyan);
-  opacity: 0.2;
+  background: #38bdf8;
+  opacity: 0.25;
+  box-shadow: 0 0 8px rgba(56,189,248,0.65);
   animation: thinking-blink 1.2s infinite ease-in-out;
 }
 
@@ -643,7 +645,7 @@ html, body {
 /* ── ARCHIVES OVERLAY ───────────────────────────────────── */
 .archives-overlay {
   position: fixed; inset: 0; z-index: 500;
-  background: rgba(5,5,8,0.9);
+  background: rgba(2,6,23,0.82);
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
 }
@@ -719,7 +721,7 @@ html, body {
   position: fixed;
   inset: 0;
   z-index: 520;
-  background: rgba(39, 48, 76, 0.35);
+  background: rgba(2, 6, 23, 0.6);
   backdrop-filter: blur(5px);
   display: flex;
   align-items: center;
@@ -728,7 +730,7 @@ html, body {
 
 .profile-panel {
   width: min(92vw, 560px);
-  background: #ffffff;
+  background: #0f1b33;
   border: 1px solid var(--border);
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(41, 60, 112, 0.22);
@@ -928,13 +930,13 @@ html, body {
   font-family: var(--font-ui);
   font-weight: 700;
   letter-spacing: 0.3px;
-  color: #33415e;
+  color: #dbeafe;
 }
 
 .profile-close {
   border: 1px solid var(--border);
-  background: #fff;
-  color: #4e5b79;
+  background: #172643;
+  color: #dbeafe;
   border-radius: 10px;
   padding: 6px 12px;
   cursor: pointer;
@@ -948,7 +950,7 @@ html, body {
 }
 
 .profile-copy {
-  color: #5a6784;
+  color: #cbd5e1;
   line-height: 1.55;
   font-size: 14px;
 }
@@ -960,13 +962,13 @@ html, body {
   padding: 10px 14px;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(90deg, #e05d6f, #f67c5c);
+  background: linear-gradient(90deg, #f43f5e, #fb7185);
   cursor: pointer;
 }
 .danger-action-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
 .profile-status {
   min-height: 18px;
-  color: #5a6784;
+  color: #cbd5e1;
   font-size: 13px;
 }

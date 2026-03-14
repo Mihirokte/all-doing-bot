@@ -38,8 +38,9 @@ async def _ensure_english_response(text: str) -> str:
         llm = get_llm()
         prompt = (
             "Rewrite the following text in clear English only. Preserve meaning, "
-            "facts, numbers, names, and URLs. If already English, keep it concise "
-            "and mostly unchanged. Output only the rewritten text. "
+            "facts, numbers, names, URLs, and formatting structure (lists/line breaks). "
+            "If already English, keep the same level of detail and mostly unchanged. "
+            "Do not shorten or compress details. Output only the rewritten text. "
             "Do not add intro phrases such as 'Here is the rewritten text'.\n\n"
             f"Text:\n{cleaned}"
         )
@@ -126,11 +127,30 @@ def _chat_looks_like_search(query: str) -> bool:
     return any(t in lower for t in triggers)
 
 
-def _search_response_from_entries(query: str, entries: list) -> str:
+def _search_wants_detail(query: str) -> bool:
+    """True when user asks to find/search/explore and expects depth."""
+    lower = query.strip().lower()
+    detail_triggers = (
+        "find",
+        "search",
+        "latest",
+        "top",
+        "best",
+        "trending",
+        "list",
+        "compare",
+        "detailed",
+        "in detail",
+    )
+    return any(t in lower for t in detail_triggers)
+
+
+def _search_response_from_entries(query: str, entries: list, detailed: bool = False) -> str:
     """Return direct, concrete search results for chat (no abstraction)."""
-    lines = [f"Here are the top results for '{query}':"]
+    lines = [f"Search results for '{query}':"]
     rank = 1
-    for e in entries[:5]:
+    cap = 7 if detailed else 5
+    for e in entries[:cap]:
         content = (getattr(e, "content", "") or "").strip()
         source = (getattr(e, "source", "") or "").strip()
         if not content:
@@ -147,25 +167,29 @@ def _search_response_from_entries(query: str, entries: list) -> str:
             snippet = rest
         snippet = snippet or content
         snippet = " ".join(snippet.split())
-        if len(snippet) > 180:
-            snippet = snippet[:180].rstrip() + "..."
-        line = f"{rank}. {title}"
+        if len(snippet) > (320 if detailed else 180):
+            snippet = snippet[: (320 if detailed else 180)].rstrip() + "..."
+        line = f"{rank}) {title}"
         if source:
-            line += f" - {source}"
+            line += f"\n   Source: {source}"
         if snippet:
-            line += f"\n   {snippet}"
+            line += f"\n   Summary: {snippet}"
         lines.append(line)
         rank += 1
     if rank == 1:
         return "I couldn't find concrete web results right now. Please try rephrasing the query."
+    if detailed:
+        lines.append("")
+        lines.append("If you want, I can continue with a deeper comparison of the top options.")
     return "\n".join(lines)
 
 
-def _crawl_response_from_records(query: str, records: list[dict]) -> str:
+def _crawl_response_from_records(query: str, records: list[dict], detailed: bool = False) -> str:
     """Return concrete link-hit results from crawled pages."""
-    lines = [f"I crawled top links for '{query}' and found:"]
+    lines = [f"I analyzed rendered pages for '{query}' and found:"]
     rank = 1
-    for rec in records[:3]:
+    cap = 5 if detailed else 3
+    for rec in records[:cap]:
         if not isinstance(rec, dict):
             continue
         url = str(rec.get("url") or "").strip()
@@ -175,13 +199,13 @@ def _crawl_response_from_records(query: str, records: list[dict]) -> str:
         if not markdown:
             continue
         summary = " ".join(markdown.split())
-        if len(summary) > 240:
-            summary = summary[:240].rstrip() + "..."
+        if len(summary) > (500 if detailed else 240):
+            summary = summary[: (500 if detailed else 240)].rstrip() + "..."
         label = title or url or f"Result {rank}"
-        line = f"{rank}. {label}"
+        line = f"{rank}) {label}"
         if url:
-            line += f" - {url}"
-        line += f"\n   {summary}"
+            line += f"\n   Source: {url}"
+        line += f"\n   Key detail: {summary}"
         lines.append(line)
         rank += 1
     if rank == 1:
@@ -189,20 +213,21 @@ def _crawl_response_from_records(query: str, records: list[dict]) -> str:
     return "\n".join(lines)
 
 
-def _fetched_response_from_entries(query: str, entries: list) -> str:
+def _fetched_response_from_entries(query: str, entries: list, detailed: bool = False) -> str:
     """Return concrete summaries from fetched page content."""
-    lines = [f"I opened top links for '{query}' and found:"]
+    lines = [f"I fetched source pages for '{query}' and found:"]
     rank = 1
-    for e in entries[:4]:
+    cap = 6 if detailed else 4
+    for e in entries[:cap]:
         content = (getattr(e, "content", "") or "").strip()
         source = (getattr(e, "source", "") or "").strip()
         if not content or content.lower().startswith("error:"):
             continue
         summary = " ".join(content.split())
-        if len(summary) > 260:
-            summary = summary[:260].rstrip() + "..."
+        if len(summary) > (520 if detailed else 260):
+            summary = summary[: (520 if detailed else 260)].rstrip() + "..."
         label = source or f"Result {rank}"
-        line = f"{rank}. {label}\n   {summary}"
+        line = f"{rank}) {label}\n   Detail: {summary}"
         lines.append(line)
         rank += 1
     if rank == 1:
@@ -223,10 +248,11 @@ async def chat(q: str = "") -> dict[str, str]:
     from apps.backend.llm.engine import get_llm
 
     query = q.strip()
-    # Web search in chat is disabled by default (CHAT_WEB_SEARCH_ENABLED=false). When enabled, search-like queries use SearXNG + optional crawl/fetch.
-    if getattr(settings, "chat_web_search_enabled", False) and _chat_looks_like_search(query):
+    detailed_search = _search_wants_detail(query)
+    # Search-like chat queries should return retrieval-backed answers with detail.
+    if _chat_looks_like_search(query):
         try:
-            if getattr(settings, "chat_deep_mode_enabled", True):
+            if getattr(settings, "chat_web_search_enabled", False) and getattr(settings, "chat_deep_mode_enabled", True):
                 from apps.backend.deep_search import run_deep_search
                 deep_response = await run_deep_search(query)
                 if deep_response:
@@ -243,7 +269,7 @@ async def chat(q: str = "") -> dict[str, str]:
                             urls.append(src)
                     if urls:
                         records = await crawl_urls(urls[:3], limit_per_url=1, formats=["markdown"], render=False)
-                        crawl_text = _crawl_response_from_records(query, records)
+                        crawl_text = _crawl_response_from_records(query, records, detailed=detailed_search)
                         if crawl_text:
                             return {"response": await _ensure_english_response(crawl_text)}
                 urls = []
@@ -253,10 +279,14 @@ async def chat(q: str = "") -> dict[str, str]:
                         urls.append(src)
                 if urls:
                     fetched = await run_action("web_fetch", {"urls": urls[:3]})
-                    fetched_text = _fetched_response_from_entries(query, fetched)
+                    fetched_text = _fetched_response_from_entries(query, fetched, detailed=detailed_search)
                     if fetched_text:
                         return {"response": await _ensure_english_response(fetched_text)}
-                return {"response": await _ensure_english_response(_search_response_from_entries(query, entries))}
+                return {
+                    "response": await _ensure_english_response(
+                        _search_response_from_entries(query, entries, detailed=detailed_search)
+                    )
+                }
         except Exception as e:
             logger.warning("Chat web search failed (continuing without): %s", e)
 
