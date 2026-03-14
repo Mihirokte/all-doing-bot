@@ -106,7 +106,7 @@ class LocalProvider(LLMProvider):
 
 
 class OllamaProvider(LLMProvider):
-    """Local Ollama server (OpenAI-compatible API at /v1/chat/completions)."""
+    """Local Ollama server via native /api/chat endpoint."""
 
     provider_name = "ollama"
 
@@ -116,32 +116,31 @@ class OllamaProvider(LLMProvider):
 
     async def generate(self, prompt: str, max_tokens: int = 256, json_mode: bool = True) -> str:
         base = settings.ollama_base_url.rstrip("/")
-        url = f"{base}/v1/chat/completions"
-        effective_max_tokens = max(max_tokens, 512)
+        url = f"{base}/api/chat"
+        effective_max_tokens = max(64, min(max_tokens, 512))
         payload = {
             "model": settings.ollama_model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1,
-            "max_tokens": effective_max_tokens,
             "stream": False,
+            "options": {
+                "temperature": 0.1,
+                "num_predict": effective_max_tokens,
+            },
         }
         # qwen3.x thinking models: disable internal reasoning so responses are fast on CPU
         if "qwen3" in (settings.ollama_model or "").lower():
             payload["think"] = False
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        async with httpx.AsyncClient(timeout=240.0) as client:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             data = response.json()
-        choices = data.get("choices") if isinstance(data, dict) else None
-        if not choices:
-            raise RuntimeError("Ollama response missing or empty 'choices'")
-        msg = choices[0].get("message") if isinstance(choices[0], dict) else None
+        msg = data.get("message") if isinstance(data, dict) else None
         if not isinstance(msg, dict):
-            raise RuntimeError("Ollama response 'choices[0].message' is missing")
+            raise RuntimeError("Ollama response missing 'message'")
         content = (msg.get("content") or "").strip()
         # For thinking models, fall back to reasoning field if content is empty
         if not content:
-            content = (msg.get("reasoning") or "").strip()
+            content = (msg.get("thinking") or "").strip()
         return content
 
 

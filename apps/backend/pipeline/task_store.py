@@ -21,7 +21,7 @@ class TaskStore:
     def __init__(self) -> None:
         self._tasks: dict[str, dict[str, Any]] = {}
 
-    def create(self, query: str) -> str:
+    def create(self, query: str, session_key: str = "default") -> str:
         """Create a new task, return task_id."""
         task_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
@@ -29,6 +29,7 @@ class TaskStore:
             "task_id": task_id,
             "status": "accepted",
             "query": query,
+            "session_key": session_key or "default",
             "result": None,
             "created_at": now,
             "updated_at": now,
@@ -63,6 +64,7 @@ class TaskStore:
             task_id=t["task_id"],
             status=t["status"],
             query=t.get("query"),
+            session_key=t.get("session_key"),
             result=result,
             created_at=created_at,
             updated_at=updated_at,

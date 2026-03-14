@@ -3,6 +3,7 @@
 const CHAT_THRESHOLD = 100; // under this many chars: /chat (instant). else: /query (pipeline)
 let queryCount = 0;
 let pollTimer = null;
+let thinkingMessageEl = null;
 
 // Short query is "search-like" (mirrors backend) → show deep retrieval status
 function looksLikeSearch(q) {
@@ -74,12 +75,15 @@ async function submitQuery() {
     setTaskStatus("RUNNING", q);
     if (looksLikeSearch(q)) setDeepRetrievalStatus(true);
     showTaskBadge(true);
+    showThinkingIndicator("Thinking");
     try {
       const data = await API.chat(q);
       const responseText = (data.response || "").trim() || "No response.";
+      hideThinkingIndicator();
       appendMsg("assistant", responseText, false, null, true);
       setTaskStatus("COMPLETED", q);
     } catch (e) {
+      hideThinkingIndicator();
       appendMsg("assistant", "Error: " + (e.message || e), true);
       setTaskStatus("IDLE", "");
     }
@@ -94,6 +98,7 @@ async function submitQuery() {
   setTaskStatus("RUNNING", q);
   showProgressBar(true);
   showTaskBadge(true);
+  showThinkingIndicator("Researching");
   try {
     const { task_id } = await API.submitQuery(q);
     document.getElementById("task-id-display").textContent = "TASK ID: " + task_id;
@@ -116,6 +121,7 @@ function startPoll(taskId) {
       if (s === "completed") {
         clearInterval(pollTimer);
         pollTimer = null;
+        hideThinkingIndicator();
         queryCount++;
         document.getElementById("metric-queries").textContent = queryCount;
         setTaskStatus("COMPLETED", d.query || "");
@@ -127,6 +133,7 @@ function startPoll(taskId) {
       } else if (s === "failed") {
         clearInterval(pollTimer);
         pollTimer = null;
+        hideThinkingIndicator();
         setTaskStatus("FAILED", d.query || "");
         showProgressBar(false);
         showTaskBadge(false);
@@ -140,6 +147,29 @@ function startPoll(taskId) {
   }, 3000);
 }
 
+function showThinkingIndicator(label) {
+  hideThinkingIndicator();
+  const log = document.getElementById("feed-log");
+  const msg = document.createElement("div");
+  msg.className = "msg msg-assistant msg-thinking";
+  msg.innerHTML =
+    '<span class="msg-ts">' + nowTs() + '</span>' +
+    '<div class="msg-body">' + escHtml(label || "Thinking") +
+    '<span class="thinking-dots">' +
+    '<span></span><span></span><span></span>' +
+    '</span></div>';
+  log.appendChild(msg);
+  log.scrollTop = log.scrollHeight;
+  thinkingMessageEl = msg;
+}
+
+function hideThinkingIndicator() {
+  if (thinkingMessageEl && thinkingMessageEl.parentNode) {
+    thinkingMessageEl.parentNode.removeChild(thinkingMessageEl);
+  }
+  thinkingMessageEl = null;
+}
+
 function formatResult(result) {
   if (!result) return "No result.";
   if (result.error) return result.error;
@@ -147,9 +177,36 @@ function formatResult(result) {
   const name = result.cohort_name || "cohort";
   let text = "Found " + n + " entries in cohort `" + name + "`. " + (result.message || "");
   const steps = result.raw && result.raw.steps;
+  const mode = result.raw && result.raw.execution_mode;
+  const toolPath = result.raw && result.raw.tool_path;
+  const connectorPath = result.raw && result.raw.connector_path;
+  const policyOutcomes = result.raw && result.raw.policy_outcomes;
+  const memoryHits = result.raw && result.raw.memory_hits;
+  const deadLetters = result.raw && result.raw.dead_letters;
+  if (mode) {
+    text += " Mode: " + mode + ".";
+  }
+  if (toolPath && toolPath.length) {
+    text += " Tool path: " + toolPath.join(" -> ") + ".";
+  }
+  if (connectorPath && connectorPath.length) {
+    text += " Connector path: " + connectorPath.join(" -> ") + ".";
+  }
   if (steps && steps.length) {
     const parts = steps.map(st => (st.action || "?") + (st.entry_count != null ? " (" + st.entry_count + ")" : ""));
     text += " Steps: " + parts.join(", ");
+  }
+  if (policyOutcomes && policyOutcomes.length) {
+    const policies = policyOutcomes.map(p => (p.action || "?") + "=" + (p.policy_decision || "allow"));
+    text += " Policy: " + policies.join(", ") + ".";
+  }
+  if (memoryHits) {
+    const shortCount = memoryHits.short_term ? memoryHits.short_term.length : 0;
+    const longCount = memoryHits.long_term ? memoryHits.long_term.length : 0;
+    text += " Memory hits: short=" + shortCount + ", long=" + longCount + ".";
+  }
+  if (deadLetters && deadLetters.length) {
+    text += " Dead letters: " + deadLetters.length + ".";
   }
   return text;
 }

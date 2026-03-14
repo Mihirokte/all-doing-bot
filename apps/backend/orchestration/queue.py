@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 STEP_QUEUE_KEY = "alldoing:step_queue"
 STEP_RESULT_PREFIX = "alldoing:step_result:"
+STEP_DEAD_LETTER_KEY = "alldoing:step_dead_letter"
 RESULT_TTL_SECONDS = 86400 * 2  # 2 days
 
 
@@ -51,6 +52,11 @@ class QueueBackend(ABC):
             out.append(r)
         return out
 
+    @abstractmethod
+    async def add_dead_letter(self, payload: StepCompletedPayload) -> None:
+        """Record an unrecoverable step outcome for replay/audit."""
+        ...
+
 
 class InMemoryQueueBackend(QueueBackend):
     """In-process queue (no Redis): enqueue/dequeue from a list. Step results in dict."""
@@ -58,6 +64,7 @@ class InMemoryQueueBackend(QueueBackend):
     def __init__(self) -> None:
         self._steps: list[StepDispatchedPayload] = []
         self._results: dict[tuple[str, int], StepCompletedPayload] = {}
+        self._dead_letters: list[StepCompletedPayload] = []
 
     async def enqueue_step(self, payload: StepDispatchedPayload) -> None:
         self._steps.append(payload)
@@ -72,6 +79,9 @@ class InMemoryQueueBackend(QueueBackend):
 
     async def get_step_result(self, run_id: str, step_index: int) -> StepCompletedPayload | None:
         return self._results.get((run_id, step_index))
+
+    async def add_dead_letter(self, payload: StepCompletedPayload) -> None:
+        self._dead_letters.append(payload)
 
 
 class RedisQueueBackend(QueueBackend):
@@ -139,18 +149,32 @@ class RedisQueueBackend(QueueBackend):
             logger.warning("Invalid step result in Redis: %s", e)
             return None
 
+    async def add_dead_letter(self, payload: StepCompletedPayload) -> None:
+        import asyncio
+        client = self._client_sync()
+        body = payload.model_dump_json()
+        await asyncio.get_event_loop().run_in_executor(None, lambda: client.lpush(STEP_DEAD_LETTER_KEY, body))
+
 
 def _queue_available() -> bool:
     url = getattr(settings, "redis_url", None) or ""
     return bool(url and url.strip())
 
 
+_QUEUE_SINGLETON: QueueBackend | None = None
+
+
 def get_queue() -> QueueBackend:
     """Return queue backend: Redis if REDIS_URL set, else in-memory."""
+    global _QUEUE_SINGLETON
+    if _QUEUE_SINGLETON is not None:
+        return _QUEUE_SINGLETON
     url = getattr(settings, "redis_url", None) or ""
     if url and url.strip():
-        return RedisQueueBackend(url.strip())
-    return InMemoryQueueBackend()
+        _QUEUE_SINGLETON = RedisQueueBackend(url.strip())
+    else:
+        _QUEUE_SINGLETON = InMemoryQueueBackend()
+    return _QUEUE_SINGLETON
 
 
 def queue_available() -> bool:

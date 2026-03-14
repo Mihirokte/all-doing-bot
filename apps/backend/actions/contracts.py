@@ -142,4 +142,18 @@ DEFAULT_CONTRACTS: dict[str, ActionContract] = {
         input_schema={"type": "object"},
         default_retry_class=RetryClass.NO_RETRY,
     ),
+    "browser_automation": ActionContract(
+        capability_id="browser_automation",
+        version="1",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "urls": {"type": "array", "items": {"type": "string"}},
+                "url": {"type": "string"},
+                "q": {"type": "string"},
+                "query": {"type": "string"},
+            },
+        },
+        default_retry_class=RetryClass.RETRY_TRANSIENT,
+    ),
 }

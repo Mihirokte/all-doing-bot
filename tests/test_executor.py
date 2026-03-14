@@ -117,8 +117,8 @@ def test_run_full_pipeline_multistep_includes_diagnostics() -> None:
     plan = PlanOutput(steps=plan_steps)
 
     async def run() -> None:
-        with patch("apps.backend.pipeline.executor.run_parse", new_callable=AsyncMock, return_value=parsed), patch(
-            "apps.backend.pipeline.executor.run_plan", new_callable=AsyncMock, return_value=plan
+        with patch(
+            "apps.backend.pipeline.executor.run_parse_and_plan", new_callable=AsyncMock, return_value=(parsed, plan)
         ), patch("apps.backend.pipeline.executor.run_action", new_callable=AsyncMock) as mock_run:
             from apps.backend.db.models import Entry
 

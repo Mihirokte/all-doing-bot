@@ -37,9 +37,16 @@ def test_status_returns_processing_then_completed() -> None:
     from apps.backend.pipeline.task_store import task_store
     task_id = task_store.create("test status")
     asyncio.run(run_pipeline(task_id, "test status"))
-    s = client.get(f"/status/{task_id}")
-    assert s.status_code == 200
-    d = s.json()
+    d = None
+    for _ in range(20):
+        s = client.get(f"/status/{task_id}")
+        assert s.status_code == 200
+        d = s.json()
+        if d["status"] == "completed":
+            break
+        import time
+        time.sleep(0.05)
+    assert d is not None
     assert d["task_id"] == task_id
     assert d["status"] == "completed"
     assert "result" in d

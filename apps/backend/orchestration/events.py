@@ -1,6 +1,7 @@
 """Orchestration event payloads for queue and run state."""
 from __future__ import annotations
 
+from typing import Optional
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,6 +15,8 @@ class StepDispatchedPayload(BaseModel):
     action: str
     params: dict[str, Any] = Field(default_factory=dict)
     idempotency_key: str = ""
+    connector_id: Optional[str] = None
+    provider_key: Optional[str] = None
 
 
 class StepCompletedPayload(BaseModel):
@@ -22,7 +25,9 @@ class StepCompletedPayload(BaseModel):
     run_id: str
     step_index: int
     action: str
+    connector_id: Optional[str] = None
+    provider_key: Optional[str] = None
     entry_count: int = 0
     entries: list[dict[str, Any]] = Field(default_factory=list)
-    error: str | None = None
-    error_code: str | None = None
+    error: Optional[str] = None
+    error_code: Optional[str] = None

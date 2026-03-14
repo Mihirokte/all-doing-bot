@@ -16,7 +16,7 @@ from apps.backend.models.schemas import (
     QueryAcceptResponse,
     TaskStatusResponse,
 )
-from apps.backend.pipeline.router import run_pipeline
+from apps.backend.pipeline.router import enqueue_pipeline
 from apps.backend.pipeline.task_store import task_store
 from apps.backend.telemetry import log_run_event
 
@@ -25,6 +25,32 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+async def _ensure_english_response(text: str) -> str:
+    """Normalize assistant output to English while preserving facts and links."""
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return cleaned
+    try:
+        from apps.backend.llm.engine import get_llm
+
+        llm = get_llm()
+        prompt = (
+            "Rewrite the following text in clear English only. Preserve meaning, "
+            "facts, numbers, names, and URLs. If already English, keep it concise "
+            "and mostly unchanged. Output only the rewritten text. "
+            "Do not add intro phrases such as 'Here is the rewritten text'.\n\n"
+            f"Text:\n{cleaned}"
+        )
+        rewritten = await llm.generate(prompt, max_tokens=450, json_mode=False)
+        rewritten = (rewritten or "").strip()
+        if rewritten.lower().startswith("here is"):
+            rewritten = rewritten.split("\n", 1)[-1].strip()
+        return rewritten or cleaned
+    except Exception as e:  # noqa: BLE001
+        logger.warning("English normalization failed; using original text: %s", e)
+        return cleaned
 
 
 @asynccontextmanager
@@ -42,8 +68,8 @@ async def lifespan(app: FastAPI):
         logger.info("Remote LLM API key configured (REMOTE_LLM_API_KEY set)")
     else:
         logger.info("Remote LLM API not configured (REMOTE_LLM_API_KEY unset); will use local or mock when needed")
-    if not settings.model_file_path and not settings.remote_llm_api_key:
-        logger.info("No remote or local model configured; using mock LLM. Set REMOTE_LLM_API_KEY or MODEL_PATH for real output")
+    if not settings.ollama_base_url and not settings.model_file_path and not settings.remote_llm_api_key:
+        logger.info("No ollama/remote/local model configured; using mock LLM. Set OLLAMA_BASE_URL or MODEL_PATH for real output")
     # Persistence (Drive + Sheets: by SPREADSHEET_ID or find/create by GOOGLE_SHEETS_SPREADSHEET_NAME)
     from apps.backend.db.google_client import spreadsheet_available
     if not settings.credentials_path:
@@ -204,7 +230,7 @@ async def chat(q: str = "") -> dict[str, str]:
                 from apps.backend.deep_search import run_deep_search
                 deep_response = await run_deep_search(query)
                 if deep_response:
-                    return {"response": deep_response}
+                    return {"response": await _ensure_english_response(deep_response)}
             entries = await run_action("search_web", {"q": query, "top_n": 5})
             if entries:
                 from apps.backend.actions.cloudflare_crawl import _available as crawl_available, crawl_urls
@@ -219,7 +245,7 @@ async def chat(q: str = "") -> dict[str, str]:
                         records = await crawl_urls(urls[:3], limit_per_url=1, formats=["markdown"], render=False)
                         crawl_text = _crawl_response_from_records(query, records)
                         if crawl_text:
-                            return {"response": crawl_text}
+                            return {"response": await _ensure_english_response(crawl_text)}
                 urls = []
                 for e in entries[:5]:
                     src = (getattr(e, "source", "") or "").strip()
@@ -229,16 +255,21 @@ async def chat(q: str = "") -> dict[str, str]:
                     fetched = await run_action("web_fetch", {"urls": urls[:3]})
                     fetched_text = _fetched_response_from_entries(query, fetched)
                     if fetched_text:
-                        return {"response": fetched_text}
-                return {"response": _search_response_from_entries(query, entries)}
+                        return {"response": await _ensure_english_response(fetched_text)}
+                return {"response": await _ensure_english_response(_search_response_from_entries(query, entries))}
         except Exception as e:
             logger.warning("Chat web search failed (continuing without): %s", e)
 
     llm = get_llm()
-    prompt = f"Answer concisely in 2-3 sentences. Do not use markdown or bullet points. Question: {query}"
+    prompt = (
+        "Answer in English only. "
+        "Answer concisely in 2-3 sentences. "
+        "Do not use markdown or bullet points. "
+        f"Question: {query}"
+    )
     try:
         response = await llm.generate(prompt, max_tokens=200, json_mode=False)
-        return {"response": (response or "").strip()}
+        return {"response": await _ensure_english_response((response or "").strip())}
     except Exception as e:
         logger.warning("Chat LLM failed: %s", e)
         raise HTTPException(status_code=503, detail="LLM unavailable for chat")
@@ -271,18 +302,19 @@ async def clear_data() -> dict:
 
 
 @app.get("/query", response_model=QueryAcceptResponse)
-async def submit_query(q: str = "") -> QueryAcceptResponse:
+async def submit_query(q: str = "", session_key: str = "default") -> QueryAcceptResponse:
     """
     Accept a natural language query, create a task, and return task_id.
     Pipeline runs in the background.
     """
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
-    task_id = task_store.create(q.strip())
-    log_run_event("run_accepted", run_id=task_id, stage="api")
-    asyncio.create_task(run_pipeline(task_id, q.strip()))
+    lane_key = (session_key or "default").strip() or "default"
+    task_id = task_store.create(q.strip(), session_key=lane_key)
+    log_run_event("run_accepted", run_id=task_id, stage="api", session_key=lane_key)
+    asyncio.create_task(enqueue_pipeline(task_id, q.strip(), lane_key))
     task_store.cleanup_old()
-    return QueryAcceptResponse(task_id=task_id, status="accepted")
+    return QueryAcceptResponse(task_id=task_id, status="accepted", session_key=lane_key)
 
 
 @app.get("/status/{task_id}", response_model=TaskStatusResponse)

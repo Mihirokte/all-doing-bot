@@ -8,7 +8,7 @@ Each action is described by an `ActionContract`:
 
 | Field | Description |
 |-------|-------------|
-| `capability_id` | Unique action type (e.g. `web_fetch`, `search_web`). Matches registry key. |
+| `capability_id` | Unique action type (e.g. `web_fetch`, `search_web`, `browser_automation`). Matches registry key. |
 | `version` | Contract version for compatibility (e.g. `"1"`). |
 | `input_schema` | JSON Schema subset for `params` passed to `execute(params)`. |
 | `output_schema` | JSON Schema for the shape of returned `list[Entry]` (optional). |

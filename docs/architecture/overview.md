@@ -50,6 +50,7 @@ testsDir --> backendApp
 - **Orchestration**: queue abstraction (in-memory or Redis), step events, run state (durable checkpoints when Redis is set)
 - **Workers**: `apps.backend.workers.run_worker` consumes step jobs from the queue, executes actions with retries, writes step results
 - **Telemetry**: structured run/step events and action_exec logs for correlation and metrics
+- **Web capability escalation**: planner can escalate `search_web -> web_fetch -> browser_automation` for dynamic/interactive pages
 
 The backend import root is `apps.backend`. See [action-contracts.md](./action-contracts.md) and [durable-checkpoints.md](./durable-checkpoints.md).
 

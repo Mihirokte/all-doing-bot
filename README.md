@@ -15,14 +15,17 @@ Parse -> Plan -> Execute -> Store
 Google Sheets / Drive
 ```
 
-- **Without Redis**: Single process; pipeline runs in-process (Parse → Plan → Execute → Store).
-- **With REDIS_URL**: Orchestrator enqueues step jobs; worker process(es) execute actions; run state and step results are durable. See [docs/deployment/single-ec2-hardening.md](docs/deployment/single-ec2-hardening.md) and [docs/architecture/durable-checkpoints.md](docs/architecture/durable-checkpoints.md).
+- **Queue-first runtime (default)**: Orchestrator dispatches step jobs through the queue abstraction and collects step results before Store.
+- **With REDIS_URL**: External worker process(es) execute actions from Redis; run state and step results are durable.
+- **Without Redis**: Queue path remains primary using inline worker-compatible execution in-process.
+- **Legacy fallback**: Optional emergency rollback to old in-process executor with `ORCHESTRATOR_LEGACY_FALLBACK_ENABLED=true`.
 
 The backend supports multiple LLM runtime modes:
 
+- `ollama` (default): local Qwen model (e.g. `qwen3.5:4b`)
 - `local`: GGUF model through `llama-cpp-python`
-- `remote`: free-tier OpenAI-compatible provider
 - `mock`: deterministic canned responses for development and tests
+- `remote`: optional OpenAI-compatible provider (opt-in)
 
 ## Repository Layout
 
@@ -82,14 +85,15 @@ For real LLM output and real persistence, configure the backend via a `.env` fil
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `REMOTE_LLM_API_KEY` | For real LLM | API key for remote OpenAI-compatible provider. If unset, the backend may use mock or local-only. |
+| `REMOTE_LLM_API_KEY` | Optional | API key for remote OpenAI-compatible provider (opt-in only). Default runtime does not require this. |
 | `REMOTE_LLM_BASE_URL` | No | Base URL for remote LLM API (default: `https://api.groq.com/openai/v1`). |
 | `REMOTE_LLM_MODEL` | No | Model name for remote API (default: `llama-3.1-8b-instant`). |
-| `LLM_PROVIDER_PRIORITY` | No | Comma-separated provider order: `local`, `remote`, `mock` (default: `local,remote,mock`). |
+| `LLM_PROVIDER_PRIORITY` | No | Comma-separated provider order (default: `ollama,local,mock` for no-key local Qwen runtime). |
 | `GOOGLE_CREDS_PATH` | For real persistence | Path to Google service account JSON. If unset, backend uses in-memory fake persistence. |
 | `SPREADSHEET_ID` | For real persistence | Google Sheet ID for catalogue and cohort data. |
 | `CHAT_WEB_SEARCH_ENABLED` | No | Set to `true` to enable web search for short search-like queries (requires SearXNG). Default: disabled. |
 | `REDIS_URL` | For queue | When set, pipeline enqueues steps to Redis; run a worker to process them (`python -m apps.backend.workers.run_worker`). Enables durable run state. |
+| `ORCHESTRATOR_LEGACY_FALLBACK_ENABLED` | No | Default `false`. If `true`, fall back to legacy in-process execution only when queue path fails. |
 | `CORS_ALLOW_ORIGINS` | No | Comma-separated origins for CORS (e.g. `http://localhost:3000`). |
 | `HOST` | No | Bind host (default: `0.0.0.0`). |
 | `PORT` | No | Bind port (default: `8000`). |
@@ -106,7 +110,8 @@ The dev bypass button is shown only on localhost; it is hidden in production.
 
 **Backend** (env on EC2/Render/etc.):
 - `CORS_ALLOW_ORIGINS=https://your-github-pages-url.github.io` (comma-separated if multiple).
-- `REMOTE_LLM_API_KEY=<your-groq-key>` (or another provider key).
+- Local-first default: keep `OLLAMA_MODEL=qwen3.5:4b` and `LLM_PROVIDER_PRIORITY=ollama,local,mock`.
+- `REMOTE_LLM_API_KEY` is optional only if you explicitly want remote fallback.
 
 Backend endpoints currently have no authentication. For production, consider adding API key or OAuth verification if the app is public.
 
@@ -125,7 +130,7 @@ Backend endpoints currently have no authentication. For production, consider add
 
 ## Status
 
-Active implementation. The repo uses a monorepo layout with `apps/backend` and `apps/frontend`. OpenClaw-style migration (Phase A+B) is in place: action contracts, run telemetry, Redis queue, worker process, durable run state, and single-EC2 hardening docs with Docker Compose.
+Active implementation. The repo uses a monorepo layout with `apps/backend` and `apps/frontend`. OpenClaw-style runtime is now queue-first with action contracts, telemetry, browser automation capability, dead-letter handling, and durable run checkpoints.
 
 ## License
 

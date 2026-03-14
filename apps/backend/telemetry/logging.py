@@ -55,3 +55,24 @@ def log_action_exec(
     )
     payload["event"] = "action_exec"
     logger.info("telemetry: %s", payload, extra={"telemetry": payload})
+
+
+def log_policy_decision(
+    action: str,
+    decision: str,
+    reason: str,
+    run_id: str | None = None,
+    step_index: int | None = None,
+    **kwargs: Any,
+) -> None:
+    """Emit structured policy decision telemetry."""
+    payload = _extra(
+        run_id=run_id,
+        step_index=step_index,
+        action=action,
+        decision=decision,
+        reason=reason,
+        **kwargs,
+    )
+    payload["event"] = "policy_decision"
+    logger.info("telemetry: %s", payload, extra={"telemetry": payload})

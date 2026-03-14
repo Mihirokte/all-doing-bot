@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     google_sheets_spreadsheet_name: str = "all-doing-bot cohorts"
 
     # LLM provider selection (ollama = local Ollama server, e.g. qwen3.5:4b)
-    llm_provider_priority: str = "ollama,local,remote,mock"
+    # Default is local-first Qwen runtime; remote provider is opt-in only.
+    llm_provider_priority: str = "ollama,local"
     model_path: str = ""
     # Ollama (local server, OpenAI-compatible at /v1/chat/completions)
     ollama_base_url: str = "http://localhost:11434"
@@ -56,6 +57,21 @@ class Settings(BaseSettings):
 
     # Queue (optional): when set, pipeline step execution uses Redis and workers.
     redis_url: str = ""
+    # Executor mode: queue-first by default, legacy in-process path is fallback only.
+    orchestrator_legacy_fallback_enabled: bool = False
+    # Queue orchestration tuning.
+    queue_step_poll_interval_seconds: float = 1.5
+    queue_step_poll_timeout_seconds: float = 300.0
+    # Connector/provider defaults.
+    connector_search_default_provider: str = "searxng"
+    connector_fetch_default_provider: str = "cloudflare"
+    connector_browser_default_provider: str = "cloudflare_browser"
+    # Policy engine (CSV lists).
+    policy_deny_actions: str = ""
+    policy_require_approval_actions: str = "browser_automation"
+    policy_allowed_hosts: str = ""
+    policy_denied_hosts: str = ""
+    policy_auto_approve: bool = False
 
     # Server
     host: str = "0.0.0.0"

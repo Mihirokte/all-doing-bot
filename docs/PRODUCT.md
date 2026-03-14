@@ -14,13 +14,13 @@ It is designed for **one active user**, with minimal token usage, extensible act
 
 ## Architecture (one sentence)
 
-**GitHub Pages / static frontend → FastAPI backend (Parse → Plan → Execute → Store) → Google Sheets / Drive.** Optionally: **Redis queue + worker** for decoupled step execution and durable run state.
+**GitHub Pages / static frontend → FastAPI backend (Parse → Plan → Execute → Store) → Google Sheets / Drive.** Runtime is queue-first; Redis + worker enables externalized durable execution.
 
 ### OpenClaw-style migration (in place)
 
 - **Action contracts**: Versioned capability schema, error taxonomy, retry policy, idempotency keys (`docs/architecture/action-contracts.md`).
 - **Run telemetry**: Structured events (run_accepted, intent_parsed, plan_ready, step_dispatched, step_completed, run_stored, run_failed) and action_exec (latency, outcome, error_code) for correlation and metrics.
-- **Queue + worker**: When `REDIS_URL` is set, the orchestrator enqueues step jobs; a separate worker process (`python -m apps.backend.workers.run_worker`) executes actions with retries and dead-letter handling. API stays stateless and polls for step results.
+- **Queue + worker**: Orchestrator dispatches step events by default. With `REDIS_URL`, a separate worker process (`python -m apps.backend.workers.run_worker`) executes actions with retries and dead-letter handling. API stays stateless and polls for step results.
 - **Durable checkpoints**: Run metadata (query, parsed, plan, status) and step results stored in Redis for replay and restart (`docs/architecture/durable-checkpoints.md`).
 - **Single-EC2 baseline**: Docker Compose (Caddy, API, worker, Redis), TLS, SG, secrets, backup (`docs/deployment/single-ec2-hardening.md`).
 
@@ -38,14 +38,14 @@ It is designed for **one active user**, with minimal token usage, extensible act
 
 - **Over ~100 characters**: Full pipeline runs in the background.
 - **Parse**: LLM extracts structured intent → `cohort_name`, `cohort_description`, `action_type`, `action_params`.
-- **Plan**: LLM produces execution steps (e.g. `search_web`, `web_fetch`, `api_call`, `transform`).
-- **Execute**: Action engine runs each step (web fetch, API call, transform, or search_web if configured).
+- **Plan**: LLM produces execution steps (e.g. `search_web`, `web_fetch`, `browser_automation`, `api_call`, `transform`).
+- **Execute**: Queue-dispatched worker runs each step, with retry/idempotency/dead-letter handling.
 - **Store**: Results are written to the cohort’s Google Sheet (or in-memory fake).
 
 So the product can:
 
 - **Create named cohorts** from natural language (“Create a bot that fetches me latest Twitter posts about AI agents” → cohort `twitter_ai_agents`).
-- **Run actions**: `web_fetch` (URLs → extracted markdown), `api_call` (generic HTTP), `transform` (data), `search_web` (SearXNG — only when pipeline plans it and SearXNG is available).
+- **Run actions**: `search_web`, `web_fetch`, `browser_automation` (rendered/dynamic pages), `api_call`, `transform`.
 - **Persist to Google Sheets**: One sheet per cohort; master catalogue in `_catalogue`.
 - **Chat without persistence**: Short questions get a single LLM reply (no web search).
 
@@ -63,10 +63,10 @@ So the product can:
 
 ### 4. **LLM runtime**
 
-- **Ollama** (local, OpenAI-compatible): e.g. `qwen3.5:4b`.
+- **Default runtime (no API keys)**: **Ollama Qwen** (`qwen3.5:4b`) with provider order `ollama,local,mock`.
 - **Local GGUF**: via `llama-cpp-python` (optional).
-- **Remote**: OpenAI-compatible API (e.g. Groq).
-- **Mock**: Canned responses for tests and when no model/API key is set.
+- **Remote**: OpenAI-compatible API (optional opt-in).
+- **Mock**: Canned responses for tests and when no local model is available.
 
 Priority order is configurable via `LLM_PROVIDER_PRIORITY`.
 
@@ -89,8 +89,8 @@ Priority order is configurable via `LLM_PROVIDER_PRIORITY`.
 - **Web search in chat**: Disabled. No SearXNG / deep search in the short-query path. Re-enable by setting `CHAT_WEB_SEARCH_ENABLED=true` and ensuring SearXNG is running and configured.
 - **SearXNG**: Optional. Only used when pipeline runs a `search_web` step; chat no longer uses it.
 - **Google persistence**: Optional. Without `GOOGLE_CREDS_PATH` and spreadsheet config, backend uses in-memory fake storage.
-- **Cloudflare crawl**: Optional. Used to enrich fetch/crawl when configured.
-- **Queue/worker**: Optional. Set `REDIS_URL` and run the worker for decoupled execution and durable run state; otherwise pipeline runs in-process.
+- **Cloudflare crawl**: Optional. Used to enrich fetch/crawl and power browser_automation when configured.
+- **Redis worker mode**: Strongly recommended for production durability. Without Redis, queue-first runtime still works via inline execution.
 
 ---
 
