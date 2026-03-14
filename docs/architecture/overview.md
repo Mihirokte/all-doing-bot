@@ -26,8 +26,15 @@ repoRoot --> testsDir[tests]
 appsDir --> backendApp[appsBackend]
 appsDir --> frontendApp[appsFrontend]
 frontendApp --> backendApp
+backendApp --> pipeline[Pipeline]
+backendApp --> orchestration[Orchestration]
+backendApp --> workers[Workers]
 backendApp --> sheetsDb[googleSheets]
 backendApp --> llmProviders[llmProviders]
+pipeline --> orchestration
+orchestration --> queue[RedisQueue]
+queue --> workers
+workers --> actions[ActionRegistry]
 testsDir --> backendApp
 ```
 
@@ -36,13 +43,15 @@ testsDir --> backendApp
 `apps/backend/` contains:
 
 - FastAPI app entrypoint
-- staged pipeline
-- provider-based LLM layer
-- adapter-based extractor
-- Google Sheets DB layer
-- action registry
+- Staged pipeline (Parse → Plan → Execute → Store)
+- Provider-based LLM layer (Ollama, local GGUF, remote, mock)
+- Adapter-based extractor and Google Sheets DB layer
+- Action registry with **contracts** (capability_id, error taxonomy, idempotency)
+- **Orchestration**: queue abstraction (in-memory or Redis), step events, run state (durable checkpoints when Redis is set)
+- **Workers**: `apps.backend.workers.run_worker` consumes step jobs from the queue, executes actions with retries, writes step results
+- **Telemetry**: structured run/step events and action_exec logs for correlation and metrics
 
-The backend import root is `apps.backend`.
+The backend import root is `apps.backend`. See [action-contracts.md](./action-contracts.md) and [durable-checkpoints.md](./durable-checkpoints.md).
 
 ## Frontend
 

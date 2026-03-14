@@ -425,6 +425,22 @@ html, body {
 .msg-assistant .msg-body {
   background: #ffffff;
   border: 1px solid var(--border);
+}
+.msg-body .msg-evidence-link {
+  color: var(--cyan);
+  text-decoration: underline;
+}
+.msg-body .msg-evidence-link:hover { color: #0dd; }
+.msg-confidence {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  margin-top: 6px;
+}
+.msg-confidence-high   { color: var(--green); }
+.msg-confidence-medium { color: var(--amber); }
+.msg-confidence-low    { color: var(--red); }
   color: #2f3d5b;
 }
 
@@ -514,6 +530,14 @@ html, body {
   text-overflow: ellipsis;
   margin-bottom: 10px;
 }
+
+.deep-retrieval-status {
+  font-size: 11px;
+  color: var(--cyan);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+.deep-retrieval-status.hidden { display: none; }
 
 .progress-bar-wrap {
   height: 3px;

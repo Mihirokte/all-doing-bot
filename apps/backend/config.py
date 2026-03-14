@@ -47,6 +47,16 @@ class Settings(BaseSettings):
         ]
     )
 
+    # Web search in chat: when False, search-like short queries are answered by LLM only (no SearXNG/deep search).
+    chat_web_search_enabled: bool = False
+    # Deep Think-Do retrieval (short search queries: 3-cycle loop, evidence-first). Only used when chat_web_search_enabled is True.
+    chat_deep_mode_enabled: bool = True
+    chat_deep_max_cycles: int = 3
+    chat_deep_top_links: int = 4
+
+    # Queue (optional): when set, pipeline step execution uses Redis and workers.
+    redis_url: str = ""
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

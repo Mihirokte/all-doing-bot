@@ -18,6 +18,7 @@ from apps.backend.models.schemas import (
 )
 from apps.backend.pipeline.router import run_pipeline
 from apps.backend.pipeline.task_store import task_store
+from apps.backend.telemetry import log_run_event
 
 logging.basicConfig(
     level=logging.INFO,
@@ -196,11 +197,16 @@ async def chat(q: str = "") -> dict[str, str]:
     from apps.backend.llm.engine import get_llm
 
     query = q.strip()
-    if _chat_looks_like_search(query):
+    # Web search in chat is disabled by default (CHAT_WEB_SEARCH_ENABLED=false). When enabled, search-like queries use SearXNG + optional crawl/fetch.
+    if getattr(settings, "chat_web_search_enabled", False) and _chat_looks_like_search(query):
         try:
+            if getattr(settings, "chat_deep_mode_enabled", True):
+                from apps.backend.deep_search import run_deep_search
+                deep_response = await run_deep_search(query)
+                if deep_response:
+                    return {"response": deep_response}
             entries = await run_action("search_web", {"q": query, "top_n": 5})
             if entries:
-                # Proper web protocol: hit returned links via Cloudflare crawl when configured.
                 from apps.backend.actions.cloudflare_crawl import _available as crawl_available, crawl_urls
 
                 if crawl_available():
@@ -214,7 +220,6 @@ async def chat(q: str = "") -> dict[str, str]:
                         crawl_text = _crawl_response_from_records(query, records)
                         if crawl_text:
                             return {"response": crawl_text}
-                # Fallback path: still hit links via web_fetch/extractor if crawl isn't configured or yields nothing.
                 urls = []
                 for e in entries[:5]:
                     src = (getattr(e, "source", "") or "").strip()
@@ -274,6 +279,7 @@ async def submit_query(q: str = "") -> QueryAcceptResponse:
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
     task_id = task_store.create(q.strip())
+    log_run_event("run_accepted", run_id=task_id, stage="api")
     asyncio.create_task(run_pipeline(task_id, q.strip()))
     task_store.cleanup_old()
     return QueryAcceptResponse(task_id=task_id, status="accepted")

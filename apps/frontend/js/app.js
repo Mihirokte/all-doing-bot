@@ -4,6 +4,14 @@ const CHAT_THRESHOLD = 100; // under this many chars: /chat (instant). else: /qu
 let queryCount = 0;
 let pollTimer = null;
 
+// Short query is "search-like" (mirrors backend) → show deep retrieval status
+function looksLikeSearch(q) {
+  const lower = (q || "").trim().toLowerCase();
+  if (lower.length < 4) return false;
+  const triggers = ["find", "search", "look up", "lookup", "get me", "fetch", "latest", "recent", "today", "this week", "top", "best", "trending", "what are the", "news about", "updates on", "launches", "release", "projects", "github"];
+  return triggers.some(t => lower.includes(t));
+}
+
 // ── Boot ─────────────────────────────────────────────────
 window.appBoot = function () {
   initClock();
@@ -62,17 +70,20 @@ async function submitQuery() {
   appendMsg("user", q);
 
   if (q.length < CHAT_THRESHOLD) {
-    // Short path: /chat — one LLM call, no cohort
+    // Short path: /chat — deep retrieval when search-like, else LLM
     setTaskStatus("RUNNING", q);
+    if (looksLikeSearch(q)) setDeepRetrievalStatus(true);
     showTaskBadge(true);
     try {
       const data = await API.chat(q);
-      appendMsg("assistant", (data.response || "").trim() || "No response.");
+      const responseText = (data.response || "").trim() || "No response.";
+      appendMsg("assistant", responseText, false, null, true);
       setTaskStatus("COMPLETED", q);
     } catch (e) {
       appendMsg("assistant", "Error: " + (e.message || e), true);
       setTaskStatus("IDLE", "");
     }
+    if (looksLikeSearch(q)) setDeepRetrievalStatus(false);
     showTaskBadge(false);
     execBtn.disabled = false;
     input.disabled = false;
@@ -149,23 +160,42 @@ function resetInput() {
 }
 
 // ── Chat message feed ─────────────────────────────────────
-function appendMsg(role, body, isError, resultPayload) {
+function appendMsg(role, body, isError, resultPayload, useHtml) {
   const log = document.getElementById("feed-log");
   const msg = document.createElement("div");
   msg.className = "msg msg-" + role + (isError ? " msg-error" : "");
   const ts = nowTs();
   let inner = '<span class="msg-ts">' + ts + '</span>';
   if (role === "result" && resultPayload && (resultPayload.raw || resultPayload.message)) {
-    inner += '<div class="msg-body">' + escHtml(body) + '</div>';
+    inner += '<div class="msg-body">' + (useHtml ? formatChatBody(body) : escHtml(body)) + '</div>';
     if (resultPayload.raw && resultPayload.raw.steps) {
       inner += '<details class="msg-details"><summary>Details</summary><pre>' + escHtml(JSON.stringify(resultPayload, null, 2)) + '</pre></details>';
     }
   } else {
-    inner += '<div class="msg-body">' + escHtml(body) + '</div>';
+    inner += '<div class="msg-body">' + (useHtml ? formatChatBody(body) : escHtml(body)) + '</div>';
   }
   msg.innerHTML = inner;
   log.appendChild(msg);
   log.scrollTop = log.scrollHeight;
+}
+
+// Evidence-first chat: markdown links -> clickable; confidence -> badge
+function formatChatBody(text) {
+  if (!text) return "";
+  const escaped = escHtml(text);
+  const withLinks = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_, label, url) =>
+    '<a href="' + escAttr(url) + '" target="_blank" rel="noopener" class="msg-evidence-link">' + label + '</a>'
+  );
+  const withConfidence = withLinks.replace(/\*Confidence: (high|medium|low)\*/gi, (_, level) =>
+    '<span class="msg-confidence msg-confidence-' + level.toLowerCase() + '">Confidence: ' + escHtml(level) + '</span>'
+  );
+  return withConfidence.replace(/\n/g, "<br>");
+}
+
+function setDeepRetrievalStatus(active) {
+  const el = document.getElementById("deep-retrieval-status");
+  if (!el) return;
+  el.classList.toggle("hidden", !active);
 }
 
 function nowTs() {

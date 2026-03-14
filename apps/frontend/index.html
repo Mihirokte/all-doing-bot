@@ -108,6 +108,7 @@
           <div class="card-label">CURRENT TASK</div>
           <div id="task-status" class="task-status idle">IDLE</div>
           <div id="task-query-display" class="task-query-display"></div>
+          <div id="deep-retrieval-status" class="deep-retrieval-status hidden">Deep retrieval in progress…</div>
           <div class="progress-bar-wrap hidden" id="progress-wrap">
             <div class="progress-bar" id="progress-bar"></div>
           </div>
@@ -133,7 +134,7 @@
           </div>
           <div class="metric-row">
             <span class="metric-name">WEB SEARCH</span>
-            <span class="metric-val online">SearXNG ACTIVE</span>
+            <span class="metric-val" id="metric-websearch">OFF</span>
           </div>
           <div class="metric-row">
             <span class="metric-name">BACKEND</span>

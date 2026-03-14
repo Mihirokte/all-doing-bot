@@ -8,14 +8,17 @@
 GitHub Pages / static frontend
         |
         v
-FastAPI backend
+FastAPI backend (optional: Redis queue + worker)
 Parse -> Plan -> Execute -> Store
         |
         v
 Google Sheets / Drive
 ```
 
-The backend now supports three LLM runtime modes:
+- **Without Redis**: Single process; pipeline runs in-process (Parse → Plan → Execute → Store).
+- **With REDIS_URL**: Orchestrator enqueues step jobs; worker process(es) execute actions; run state and step results are durable. See [docs/deployment/single-ec2-hardening.md](docs/deployment/single-ec2-hardening.md) and [docs/architecture/durable-checkpoints.md](docs/architecture/durable-checkpoints.md).
+
+The backend supports multiple LLM runtime modes:
 
 - `local`: GGUF model through `llama-cpp-python`
 - `remote`: free-tier OpenAI-compatible provider
@@ -59,11 +62,19 @@ cd apps/frontend
 python -m http.server 3000
 ```
 
+Run the worker (when using Redis):
+
+```bash
+REDIS_URL=redis://localhost:6379/0 python -m apps.backend.workers.run_worker
+```
+
 Run tests:
 
 ```bash
 python -m pytest tests -q
 ```
+
+Regressive checks (no test files): start backend, then `curl http://localhost:8000/health`, `curl "http://localhost:8000/query?q=..."`, and poll `GET /status/<task_id>` until completed.
 
 ## Environment variables
 
@@ -77,6 +88,8 @@ For real LLM output and real persistence, configure the backend via a `.env` fil
 | `LLM_PROVIDER_PRIORITY` | No | Comma-separated provider order: `local`, `remote`, `mock` (default: `local,remote,mock`). |
 | `GOOGLE_CREDS_PATH` | For real persistence | Path to Google service account JSON. If unset, backend uses in-memory fake persistence. |
 | `SPREADSHEET_ID` | For real persistence | Google Sheet ID for catalogue and cohort data. |
+| `CHAT_WEB_SEARCH_ENABLED` | No | Set to `true` to enable web search for short search-like queries (requires SearXNG). Default: disabled. |
+| `REDIS_URL` | For queue | When set, pipeline enqueues steps to Redis; run a worker to process them (`python -m apps.backend.workers.run_worker`). Enables durable run state. |
 | `CORS_ALLOW_ORIGINS` | No | Comma-separated origins for CORS (e.g. `http://localhost:3000`). |
 | `HOST` | No | Bind host (default: `0.0.0.0`). |
 | `PORT` | No | Bind port (default: `8000`). |
@@ -99,16 +112,20 @@ Backend endpoints currently have no authentication. For production, consider add
 
 ## Documentation
 
+- [docs/PRODUCT.md](./docs/PRODUCT.md): **product roundup** — what it is, what it can do, web search status, comparison with Open Claw, queue/worker mode
 - [AGENTS.md](./AGENTS.md): primary repo-level instructions for coding agents
 - [docs/implementation-plan.md](./docs/implementation-plan.md): phased implementation plan
 - [docs/architecture/overview.md](./docs/architecture/overview.md): monorepo and system structure overview
+- [docs/architecture/action-contracts.md](./docs/architecture/action-contracts.md): action contracts, error taxonomy, idempotency
+- [docs/architecture/durable-checkpoints.md](./docs/architecture/durable-checkpoints.md): durable run state and checkpoints (Redis)
+- [docs/deployment/single-ec2-hardening.md](./docs/deployment/single-ec2-hardening.md): single EC2 with Docker Compose, Caddy, Redis, worker, TLS, backup
 - [docs/deployment/aws-credentials-and-deploy.md](./docs/deployment/aws-credentials-and-deploy.md): AWS credentials for deploy agents, IAM roles, and EC2 setup/update
 - [docs/instructions/backend-workflow.md](./docs/instructions/backend-workflow.md): backend-specific workflow guidance
 - [docs/instructions/frontend-workflow.md](./docs/instructions/frontend-workflow.md): frontend-specific workflow guidance
 
 ## Status
 
-Active implementation is underway. The repo now uses a monorepo-style layout with `apps/backend` and `apps/frontend`, while tests remain at the repo root.
+Active implementation. The repo uses a monorepo layout with `apps/backend` and `apps/frontend`. OpenClaw-style migration (Phase A+B) is in place: action contracts, run telemetry, Redis queue, worker process, durable run state, and single-EC2 hardening docs with Docker Compose.
 
 ## License
 
