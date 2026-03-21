@@ -1,0 +1,31 @@
+# GitHub Pages is configured to serve the gh-pages branch from /.
+# The app lives in apps/frontend/ on main — this workflow copies that folder
+# to the root of gh-pages so https://<user>.github.io/<repo>/ loads the UI.
+
+name: Deploy GitHub Pages (frontend)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish apps/frontend to gh-pages branch root
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./apps/frontend
+          # Single-purpose branch: only static site files at root (no monorepo README).
+          force_orphan: true
