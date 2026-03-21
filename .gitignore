@@ -15,6 +15,12 @@ poke-tasks-433-*.json
 .DS_Store
 *.swp
 
+# Local junk (do not commit)
+AnyDesk.exe
+*.dll
+*.conf.lock
+verify_procedural_bg_*.webp
+
 # pytest
 .pytest_cache/
 .coverage
