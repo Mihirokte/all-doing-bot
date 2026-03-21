@@ -1,13 +1,14 @@
 # Deploy FastAPI backend on your EC2 box (git pull, pip, systemd restart).
 #
 # Setup (repo Settings → Secrets and variables):
-#   Secrets: EC2_HOST, EC2_SSH_KEY (private key PEM), EC2_USER (e.g. ubuntu)
+#   Secrets: EC2_HOST, EC2_SSH_KEY (private key PEM), EC2_USER (ubuntu OR ec2-user — match your AMI)
 # Optional:
 #   Repository variable EC2_AUTO_DEPLOY = true  → runs on every push to main
 #   If unset, only "Run workflow" (workflow_dispatch) deploys the backend.
 #
-# EC2 must have: repo at /home/ubuntu/all-doing-bot, venv, systemd unit "alldoing",
-# Python 3.10+ in venv (required for langgraph + mcp).
+# EC2 must have: repo at REPO_DIR (default below), venv with Python 3.10+, systemd "alldoing".
+# Amazon Linux: EC2_USER=ec2-user, REPO_DIR=/home/ec2-user/all-doing-bot
+# Ubuntu: EC2_USER=ubuntu, REPO_DIR=/home/ubuntu/all-doing-bot
 
 name: Deploy backend (EC2)
 
@@ -34,7 +35,8 @@ jobs:
           script_stop: true
           script: |
             set -euo pipefail
-            cd /home/ubuntu/all-doing-bot
+            REPO_DIR="${REPO_DIR:-/home/${USER}/all-doing-bot}"
+            cd "$REPO_DIR"
             git fetch origin main
             git reset --hard origin/main
             source venv/bin/activate
