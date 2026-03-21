@@ -1,6 +1,7 @@
 """All configuration from environment variables. No hardcoded secrets."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import List, Optional
 
@@ -62,8 +63,15 @@ class Settings(BaseSettings):
     # Queue orchestration tuning.
     queue_step_poll_interval_seconds: float = 1.5
     queue_step_poll_timeout_seconds: float = 300.0
-    # Connector/provider defaults.
+    # Connector/provider defaults. Use "mcp" + MCP_SEARCH_COMMAND_JSON for MCP-only search (no vendor search HTTP APIs).
     connector_search_default_provider: str = "searxng"
+    # JSON array of strings: e.g. '["npx","-y","@modelcontextprotocol/server-brave-search"]' (example only; pick your MCP server).
+    mcp_search_command_json: str = ""
+    mcp_search_tool_name: str = "search"
+    # Argument name for the search query when calling the MCP tool (many servers use "query" or "q").
+    mcp_search_query_param: str = "query"
+    # When True, run parse then plan as two LangGraph nodes (two LLM calls) instead of one combined call.
+    langgraph_parse_plan: bool = True
     connector_fetch_default_provider: str = "cloudflare"
     connector_browser_default_provider: str = "cloudflare_browser"
     # Policy engine (CSV lists).
@@ -100,6 +108,19 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
+    @property
+    def mcp_search_argv(self) -> List[str]:
+        raw = (self.mcp_search_command_json or "").strip()
+        if not raw:
+            return []
+        try:
+            v = json.loads(raw)
+        except json.JSONDecodeError:
+            return []
+        if not isinstance(v, list) or not v or not all(isinstance(x, str) for x in v):
+            return []
+        return list(v)
 
 
 settings = Settings()

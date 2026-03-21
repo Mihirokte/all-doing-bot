@@ -11,10 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from apps.backend.config import settings
 from apps.backend.models.schemas import (
-    CohortInfo,
     CohortEntry,
+    CohortInfo,
     QueryAcceptResponse,
     TaskStatusResponse,
+    WorkflowItem,
+    WorkflowSaveBody,
+    WorkflowSaveResponse,
 )
 from apps.backend.pipeline.router import enqueue_pipeline
 from apps.backend.pipeline.task_store import task_store
@@ -373,6 +376,58 @@ async def list_cohorts() -> list[CohortInfo]:
         )
         for c in cohorts
     ]
+
+
+@app.post("/workflows/task", response_model=WorkflowSaveResponse)
+async def workflow_add_task(body: WorkflowSaveBody) -> WorkflowSaveResponse:
+    """Deterministic: save one task row (Sheets cohort per session_key). No LLM."""
+    from apps.backend.workflows.handlers import append_item
+
+    sk = (body.session_key or "default").strip() or "default"
+    out = await append_item(sk, "tasks", body.text)
+    if not out.get("ok"):
+        return WorkflowSaveResponse(ok=False, error=out.get("error"), message=out.get("message", ""))
+    return WorkflowSaveResponse(
+        ok=True,
+        cohort_name=out.get("cohort_name", ""),
+        entry_id=out.get("entry_id"),
+        message=out.get("message", ""),
+    )
+
+
+@app.post("/workflows/note", response_model=WorkflowSaveResponse)
+async def workflow_add_note(body: WorkflowSaveBody) -> WorkflowSaveResponse:
+    """Deterministic: save one note row. No LLM."""
+    from apps.backend.workflows.handlers import append_item
+
+    sk = (body.session_key or "default").strip() or "default"
+    out = await append_item(sk, "notes", body.text)
+    if not out.get("ok"):
+        return WorkflowSaveResponse(ok=False, error=out.get("error"), message=out.get("message", ""))
+    return WorkflowSaveResponse(
+        ok=True,
+        cohort_name=out.get("cohort_name", ""),
+        entry_id=out.get("entry_id"),
+        message=out.get("message", ""),
+    )
+
+
+@app.get("/workflows/tasks", response_model=list[WorkflowItem])
+async def workflow_list_tasks(session_key: str = "default", limit: int = 50) -> list[WorkflowItem]:
+    from apps.backend.workflows.handlers import list_items
+
+    sk = (session_key or "default").strip() or "default"
+    rows = await list_items(sk, "tasks", limit=min(max(1, limit), 200))
+    return [WorkflowItem(entry_id=r["entry_id"], content=r["content"], created_at=r["created_at"]) for r in rows]
+
+
+@app.get("/workflows/notes", response_model=list[WorkflowItem])
+async def workflow_list_notes(session_key: str = "default", limit: int = 50) -> list[WorkflowItem]:
+    from apps.backend.workflows.handlers import list_items
+
+    sk = (session_key or "default").strip() or "default"
+    rows = await list_items(sk, "notes", limit=min(max(1, limit), 200))
+    return [WorkflowItem(entry_id=r["entry_id"], content=r["content"], created_at=r["created_at"]) for r in rows]
 
 
 @app.get("/cohort/{name}", response_model=list[CohortEntry])

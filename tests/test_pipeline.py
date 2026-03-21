@@ -1,9 +1,13 @@
 """Tests for task lifecycle and API endpoints. Pipeline is stubbed (no LLM/DB)."""
 import asyncio
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
 
+from apps.backend.db.models import Entry
 from apps.backend.main import app
+from apps.backend.models.schemas import ParsedIntent, PlanOutput, PlanStep
 from apps.backend.pipeline.router import run_pipeline
 
 client = TestClient(app)
@@ -35,8 +39,30 @@ def test_query_accepts_and_returns_task_id() -> None:
 def test_status_returns_processing_then_completed() -> None:
     # Create task via store directly so we don't start the background task (TestClient doesn't run it before we poll)
     from apps.backend.pipeline.task_store import task_store
+
+    parsed = ParsedIntent(
+        cohort_name="test_cohort",
+        action_type="transform",
+        action_params={"input": [{}]},
+    )
+    plan = PlanOutput(steps=[PlanStep(action="transform", params={"input": [{"x": 1}]})])
+
     task_id = task_store.create("test status")
-    asyncio.run(run_pipeline(task_id, "test status"))
+
+    async def _run() -> None:
+        with patch(
+            "apps.backend.agents.parse_plan.run_parse_plan_langgraph",
+            new_callable=AsyncMock,
+            return_value=(parsed, plan),
+        ), patch(
+            "apps.backend.pipeline.executor.run_action_strict", new_callable=AsyncMock
+        ) as mock_run:
+            mock_run.return_value = [
+                Entry(content="ok", source="transform", metadata="{}", created_at="2020-01-01T00:00:00Z"),
+            ]
+            await run_pipeline(task_id, "test status")
+
+    asyncio.run(_run())
     d = None
     for _ in range(20):
         s = client.get(f"/status/{task_id}")

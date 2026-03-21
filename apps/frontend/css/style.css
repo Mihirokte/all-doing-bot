@@ -972,3 +972,100 @@ html, body {
   color: #cbd5e1;
   font-size: 13px;
 }
+
+/* ── Quick workflow modes + task/note panels ─────────────── */
+.workflow-modes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mode-chip {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.mode-chip:hover {
+  color: var(--text);
+  border-color: var(--cyan);
+}
+
+.mode-chip.active {
+  color: var(--bg);
+  background: linear-gradient(135deg, var(--cyan), #38bdf8);
+  border-color: transparent;
+  box-shadow: var(--glow-c);
+}
+
+.workflow-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg2);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.workflow-card .card-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+
+.wf-refresh {
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--cyan);
+  border-radius: 8px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.workflow-list {
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.workflow-empty {
+  color: var(--muted);
+  font-style: italic;
+  padding: 6px 0;
+}
+
+.workflow-row {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(37, 56, 95, 0.6);
+}
+.workflow-row:last-child { border-bottom: none; }
+
+.wf-ts {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.wf-body {
+  color: var(--text-dim);
+  line-height: 1.4;
+  word-break: break-word;
+}

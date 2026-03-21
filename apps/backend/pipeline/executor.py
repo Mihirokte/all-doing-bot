@@ -336,7 +336,12 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
         memory_prompt = "\n".join(memory_lines).strip()
         query_with_memory = query if not memory_prompt else f"{query}\n\n[Memory Context]\n{memory_prompt}"
 
-        parsed, plan = await run_parse_and_plan(query_with_memory)
+        if settings.langgraph_parse_plan:
+            from apps.backend.agents.parse_plan import run_parse_plan_langgraph
+
+            parsed, plan = await run_parse_plan_langgraph(query_with_memory)
+        else:
+            parsed, plan = await run_parse_and_plan(query_with_memory)
         if not parsed:
             log_run_event("run_failed", run_id=task_id, stage="parse", outcome="fail", error="Parse+plan stage failed: no valid JSON")
             task_store.set_failed(task_id, "Parse+plan stage failed: no valid JSON")

@@ -79,6 +79,29 @@ python -m pytest tests -q
 
 Regressive checks (no test files): start backend, then `curl http://localhost:8000/health`, `curl "http://localhost:8000/query?q=..."`, and poll `GET /status/<task_id>` until completed.
 
+## Quick workflows (UI) + session
+
+The frontend **Quick workflow** row has three modes:
+
+- **Ask your AI** — same as before: short text → `GET /chat`, long text → `GET /query` + poll (parse/plan/execute pipeline).
+- **Add task** / **Note it** — deterministic `POST /workflows/task` and `POST /workflows/note` (no LLM). Rows are stored in Google Sheets cohorts named from a hash of `session_key` (`wf_tasks_*` / `wf_notes_*`). Lists: `GET /workflows/tasks`, `GET /workflows/notes`.
+
+`session_key` is sent on chat, query, and workflow calls. After Google sign-in it is the JWT `sub` (persisted in `localStorage`); dev bypass uses `local-dev`.
+
+## Parse/plan orchestration (LangGraph)
+
+When `LANGGRAPH_PARSE_PLAN=true` (default), the long pipeline runs **parse** then **plan** as two LLM calls in a small LangGraph (`apps/backend/agents/parse_plan.py`) instead of one combined JSON call. On graph failure it falls back to the legacy combined call.
+
+## Web search via MCP (optional)
+
+To use a **local MCP server** for `search_web` (no vendor search REST API in-app):
+
+1. Set `CONNECTOR_SEARCH_DEFAULT_PROVIDER=mcp`.
+2. Set `MCP_SEARCH_COMMAND_JSON` to a JSON array of argv, e.g. `["npx","-y","your-mcp-package"]` (depends on the server you run).
+3. Set `MCP_SEARCH_TOOL_NAME` (and optionally `MCP_SEARCH_QUERY_PARAM`) to match that server’s tool schema.
+
+If MCP is not configured or `CONNECTOR_SEARCH_DEFAULT_PROVIDER=searxng`, behavior stays on SearXNG (`WebSearchAction`).
+
 ## Environment variables
 
 For real LLM output and real persistence, configure the backend via a `.env` file (copy from `.env.example`).
@@ -91,7 +114,12 @@ For real LLM output and real persistence, configure the backend via a `.env` fil
 | `LLM_PROVIDER_PRIORITY` | No | Comma-separated provider order (default: `ollama,local,mock` for no-key local Qwen runtime). |
 | `GOOGLE_CREDS_PATH` | For real persistence | Path to Google service account JSON. If unset, backend uses in-memory fake persistence. |
 | `SPREADSHEET_ID` | For real persistence | Google Sheet ID for catalogue and cohort data. |
-| `CHAT_WEB_SEARCH_ENABLED` | No | Set to `true` to enable web search for short search-like queries (requires SearXNG). Default: disabled. |
+| `CHAT_WEB_SEARCH_ENABLED` | No | Set to `true` to enable web search for short search-like queries (requires SearXNG or MCP search). Default: disabled. |
+| `LANGGRAPH_PARSE_PLAN` | No | Default `true`. Use LangGraph for separate parse + plan LLM steps. |
+| `CONNECTOR_SEARCH_DEFAULT_PROVIDER` | No | `searxng` (default) or `mcp` when MCP search is configured. |
+| `MCP_SEARCH_COMMAND_JSON` | For MCP search | JSON array of command argv to start the MCP server (stdio). |
+| `MCP_SEARCH_TOOL_NAME` | For MCP search | Tool name to call (default `search`). |
+| `MCP_SEARCH_QUERY_PARAM` | For MCP search | Argument key for the query (default `query`). |
 | `REDIS_URL` | For queue | When set, pipeline enqueues steps to Redis; run a worker to process them (`python -m apps.backend.workers.run_worker`). Enables durable run state. |
 | `ORCHESTRATOR_LEGACY_FALLBACK_ENABLED` | No | Default `false`. If `true`, fall back to legacy in-process execution only when queue path fails. |
 | `CORS_ALLOW_ORIGINS` | No | Comma-separated origins for CORS (e.g. `http://localhost:3000`). |

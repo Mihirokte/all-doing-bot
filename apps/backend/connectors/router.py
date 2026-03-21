@@ -9,6 +9,7 @@ from apps.backend.config import settings
 from apps.backend.connectors.base import BaseConnector
 from apps.backend.connectors.fetch_cloudflare import CloudflareFetchConnector
 from apps.backend.connectors.fetch_extractor import ExtractorFetchConnector
+from apps.backend.connectors.search_mcp import McpSearchConnector
 from apps.backend.connectors.search_searxng import SearxngSearchConnector
 from apps.backend.db.models import Entry
 
@@ -26,8 +27,12 @@ class ConnectorRouter:
     """Select and execute connector providers by capability."""
 
     def __init__(self) -> None:
+        search_chain: list[BaseConnector] = []
+        if settings.mcp_search_argv:
+            search_chain.append(McpSearchConnector())
+        search_chain.append(SearxngSearchConnector())
         self._connectors: dict[str, list[BaseConnector]] = {
-            "search_web": [SearxngSearchConnector()],
+            "search_web": search_chain,
             "web_fetch": [CloudflareFetchConnector(), ExtractorFetchConnector()],
             "browser_automation": [BrowserAutomationConnector()],
         }
@@ -66,8 +71,12 @@ class ConnectorRouter:
 
     @staticmethod
     def _default_provider_for(capability_id: str) -> str:
+        if capability_id == "search_web":
+            sd = str(getattr(settings, "connector_search_default_provider", "searxng")).strip().lower()
+            if sd == "mcp" and not settings.mcp_search_argv:
+                sd = "searxng"
+            return sd
         defaults = {
-            "search_web": str(getattr(settings, "connector_search_default_provider", "searxng")),
             "web_fetch": str(getattr(settings, "connector_fetch_default_provider", "cloudflare")),
             "browser_automation": str(getattr(settings, "connector_browser_default_provider", "cloudflare_browser")),
         }

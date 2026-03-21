@@ -1,6 +1,8 @@
 /** ALL-DOING Intelligence Terminal — chat-style UI, smart routing by length */
 
 const CHAT_THRESHOLD = 100; // under this many chars: /chat (instant). else: /query (pipeline)
+/** @type {"ask"|"task"|"note"} */
+let workflowMode = "ask";
 let queryCount = 0;
 let pollTimer = null;
 let thinkingMessageEl = null;
@@ -18,12 +20,13 @@ function looksLikeSearch(q) {
 // ── Boot ─────────────────────────────────────────────────
 window.appBoot = function () {
   initClock();
-  initQuickTags();
+  initWorkflowModes();
   initQueryBox();
   initProfile();
   initArchives();
   initSignOut();
   loadCohorts();
+  loadWorkflowPanels();
   checkBackend();
   document.getElementById("boot-ts").textContent = nowTs();
 };
@@ -38,15 +41,56 @@ function initClock() {
   setInterval(tick, 1000);
 }
 
-// ── Quick-tag shortcuts ───────────────────────────────────
-function initQuickTags() {
-  document.querySelectorAll(".ex-tag").forEach(tag => {
-    tag.addEventListener("click", () => {
+// ── Quick workflow: Ask AI | Add task | Note it ────────────
+function initWorkflowModes() {
+  document.querySelectorAll(".mode-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      workflowMode = /** @type {"ask"|"task"|"note"} */ (btn.dataset.mode || "ask");
+      document.querySelectorAll(".mode-chip").forEach(b => b.classList.toggle("active", b === btn));
       const input = document.getElementById("main-query");
-      input.value = tag.dataset.q;
+      if (workflowMode === "ask") {
+        input.placeholder = "Ask anything, search, or request research…";
+      } else if (workflowMode === "task") {
+        input.placeholder = "Task title or description (saved without AI)…";
+      } else {
+        input.placeholder = "Note text (saved without AI)…";
+      }
       input.focus();
     });
   });
+  const ref = document.getElementById("refresh-workflows");
+  if (ref) ref.addEventListener("click", () => loadWorkflowPanels());
+}
+
+async function loadWorkflowPanels() {
+  try {
+    const tasks = await API.listTasks(40);
+    renderWorkflowList("tasks-list", tasks);
+  } catch (e) {
+    const el = document.getElementById("tasks-list");
+    if (el) el.innerHTML = '<div class="workflow-empty" style="color:var(--red)">Load failed</div>';
+  }
+  try {
+    const notes = await API.listNotes(40);
+    renderWorkflowList("notes-list", notes);
+  } catch (e) {
+    const el = document.getElementById("notes-list");
+    if (el) el.innerHTML = '<div class="workflow-empty" style="color:var(--red)">Load failed</div>';
+  }
+}
+
+function renderWorkflowList(elementId, items) {
+  const el = document.getElementById(elementId);
+  if (!el) return;
+  if (!items || !items.length) {
+    el.innerHTML = '<div class="workflow-empty">No items yet.</div>';
+    return;
+  }
+  el.innerHTML = items.map(t => {
+    const ts = (t.created_at || "").replace("T", " ").slice(0, 19);
+    const body = escHtml((t.content || "").slice(0, 220));
+    return '<div class="workflow-row"><span class="wf-ts">' + escHtml(ts) + '</span><div class="wf-body">' + body + "</div></div>";
+  }).join("");
 }
 
 // ── Query box: auto-clear on submit, smart routing ──────────
@@ -71,6 +115,46 @@ async function submitQuery() {
   input.disabled = true;
 
   appendMsg("user", q);
+
+  if (workflowMode === "task") {
+    setTaskStatus("RUNNING", q);
+    showTaskBadge(true);
+    try {
+      const r = await API.addTask(q);
+      const msg = (r && r.message) ? r.message : "Task saved.";
+      appendMsg("assistant", r.ok ? msg : ("Error: " + (r.error || msg)), !r.ok);
+      setTaskStatus(r.ok ? "COMPLETED" : "FAILED", q);
+      await loadWorkflowPanels();
+      await loadCohorts();
+    } catch (e) {
+      appendMsg("assistant", "Error: " + (e.message || e), true);
+      setTaskStatus("FAILED", q);
+    }
+    showTaskBadge(false);
+    execBtn.disabled = false;
+    input.disabled = false;
+    return;
+  }
+
+  if (workflowMode === "note") {
+    setTaskStatus("RUNNING", q);
+    showTaskBadge(true);
+    try {
+      const r = await API.addNote(q);
+      const msg = (r && r.message) ? r.message : "Note saved.";
+      appendMsg("assistant", r.ok ? msg : ("Error: " + (r.error || msg)), !r.ok);
+      setTaskStatus(r.ok ? "COMPLETED" : "FAILED", q);
+      await loadWorkflowPanels();
+      await loadCohorts();
+    } catch (e) {
+      appendMsg("assistant", "Error: " + (e.message || e), true);
+      setTaskStatus("FAILED", q);
+    }
+    showTaskBadge(false);
+    execBtn.disabled = false;
+    input.disabled = false;
+    return;
+  }
 
   if (q.length < CHAT_THRESHOLD) {
     // Short path: /chat — deep retrieval when search-like, else LLM
@@ -131,6 +215,7 @@ function startPoll(taskId) {
         showTaskBadge(false);
         appendMsg("result", formatResult(d.result), false, d.result);
         loadCohorts();
+        loadWorkflowPanels();
         resetInput();
       } else if (s === "failed") {
         clearInterval(pollTimer);
@@ -374,6 +459,7 @@ function initProfile() {
       document.getElementById("feed-log").innerHTML =
         '<div class="msg msg-system" id="boot-msg"><span class="msg-ts" id="boot-ts">' + nowTs() + '</span><span class="msg-body">All history cleared. Ready for a fresh start.</span></div>';
       await loadCohorts();
+      await loadWorkflowPanels();
     } catch (e) {
       statusEl.textContent = "Failed: " + (e.message || e);
     } finally {

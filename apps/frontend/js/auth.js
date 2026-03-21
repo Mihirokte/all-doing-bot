@@ -5,9 +5,43 @@ const CLIENT_ID = typeof window !== "undefined" && window.GOOGLE_CLIENT_ID
   : "YOUR_GOOGLE_CLIENT_ID_HERE";
 
 const LOGIN_CACHE_KEY  = "allDoingBotLoggedInAt";
+const SESSION_KEY_STORAGE = "allDoingSessionKey";
 const LOGIN_CACHE_DAYS = 30;
 
 let isAuthenticated = false;
+
+function parseJwtSub(credential) {
+  try {
+    const parts = String(credential).split(".");
+    if (parts.length < 2) return "default";
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64.length % 4;
+    if (pad) b64 += "=".repeat(4 - pad);
+    const json = JSON.parse(atob(b64));
+    return String(json.sub || json.email || "default");
+  } catch (e) {
+    return "default";
+  }
+}
+
+function persistSessionKey(sk) {
+  try {
+    localStorage.setItem(SESSION_KEY_STORAGE, String(sk || "default"));
+  } catch (e) { /* ignore */ }
+}
+
+function readStoredSessionKey() {
+  try {
+    return localStorage.getItem(SESSION_KEY_STORAGE) || "default";
+  } catch (e) {
+    return "default";
+  }
+}
+
+window.getSessionKey = function () {
+  if (typeof window.SESSION_KEY === "string" && window.SESSION_KEY.length) return window.SESSION_KEY;
+  return readStoredSessionKey();
+};
 
 function isLocalHost() {
   return typeof window !== "undefined" &&
@@ -36,6 +70,9 @@ function clearLoginCache() {
 function handleCredentialResponse(response) {
   if (typeof response.credential === "string") {
     console.log("[auth] Google Sign-In OK");
+    const sk = parseJwtSub(response.credential);
+    window.SESSION_KEY = sk;
+    persistSessionKey(sk);
   }
   isAuthenticated = true;
   persistLogin();
@@ -43,6 +80,7 @@ function handleCredentialResponse(response) {
 }
 
 function unlockSystem() {
+  if (!window.SESSION_KEY) window.SESSION_KEY = readStoredSessionKey();
   document.getElementById("login-overlay").style.display = "none";
   document.getElementById("terminal-root").style.display  = "flex";
   document.getElementById("terminal-root").style.flexDirection = "column";
@@ -57,6 +95,8 @@ function initGoogleAuth() {
       devBtn.classList.add("visible");
       devBtn.addEventListener("click", () => {
         isAuthenticated = true;
+        window.SESSION_KEY = "local-dev";
+        persistSessionKey("local-dev");
         unlockSystem();
       });
     }
@@ -65,6 +105,7 @@ function initGoogleAuth() {
   const fromCache = hasValidCachedLogin();
   if (fromCache) {
     isAuthenticated = true;
+    window.SESSION_KEY = readStoredSessionKey();
     unlockSystem();
     return;
   }
@@ -87,5 +128,6 @@ function initGoogleAuth() {
 // Expose sign-out helper
 window.clearAllDoingLoginCache = function () {
   clearLoginCache();
+  try { localStorage.removeItem(SESSION_KEY_STORAGE); } catch (e) {}
   window.location.reload();
 };

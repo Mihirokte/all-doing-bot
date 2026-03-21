@@ -139,3 +139,28 @@ class MemoryContext(BaseModel):
 
     short_term: list[MemoryRecord] = Field(default_factory=list)
     long_term: list[MemoryHit] = Field(default_factory=list)
+
+
+class WorkflowSaveBody(BaseModel):
+    """POST body for deterministic task/note workflows."""
+
+    text: str = ""
+    session_key: str = "default"
+
+
+class WorkflowItem(BaseModel):
+    """One row in tasks or notes list."""
+
+    entry_id: int = 0
+    content: str = ""
+    created_at: str = ""
+
+
+class WorkflowSaveResponse(BaseModel):
+    """Result of POST /workflows/task or /workflows/note."""
+
+    ok: bool = True
+    cohort_name: str = ""
+    entry_id: Optional[int] = None
+    message: str = ""
+    error: Optional[str] = None

@@ -72,14 +72,14 @@
           </div>
           <div class="query-input-row">
             <span class="query-prefix">$&gt;</span>
-            <input type="text" id="main-query" placeholder="search web, analyze data, fetch intel..." autocomplete="off" spellcheck="false" />
+            <input type="text" id="main-query" placeholder="Ask anything, search, or request research…" autocomplete="off" spellcheck="false" />
             <button id="exec-btn" class="exec-btn">EXEC</button>
           </div>
-          <div class="query-examples">
-            <span class="ex-label">QUICK:</span>
-            <span class="ex-tag" data-q="search for latest AI news">AI NEWS</span>
-            <span class="ex-tag" data-q="find trending Python frameworks 2026">PYTHON TRENDS</span>
-            <span class="ex-tag" data-q="fetch top GitHub projects today">GITHUB TODAY</span>
+          <div class="query-examples workflow-modes">
+            <span class="ex-label">QUICK WORKFLOW</span>
+            <button type="button" class="mode-chip active" data-mode="ask" title="Chat or long research pipeline">ASK YOUR AI</button>
+            <button type="button" class="mode-chip" data-mode="task" title="Save a task — no LLM">ADD TASK</button>
+            <button type="button" class="mode-chip" data-mode="note" title="Save a note — no LLM">NOTE IT</button>
           </div>
         </div>
 
@@ -90,10 +90,10 @@
             <span id="task-badge" class="task-badge hidden">TASK RUNNING</span>
             <button class="clear-btn" id="clear-log">CLR</button>
           </div>
-          <div id="feed-log" class="feed-log chat-log">
+            <div id="feed-log" class="feed-log chat-log">
             <div class="msg msg-system" id="boot-msg">
               <span class="msg-ts" id="boot-ts"></span>
-              <span class="msg-body">System ready. Short questions get instant replies; longer requests run research and create cohorts.</span>
+              <span class="msg-body">Pick a quick workflow above. Ask AI uses chat/research; Add task &amp; Note it save to your panels (Sheets) with no AI.</span>
             </div>
           </div>
         </div>
@@ -113,6 +113,20 @@
             <div class="progress-bar" id="progress-bar"></div>
           </div>
           <div id="task-id-display" class="task-id-display"></div>
+        </div>
+
+        <!-- Tasks / notes (per session, Sheets-backed) -->
+        <div class="workflow-card">
+          <div class="card-label">TASKS <button type="button" class="wf-refresh" id="refresh-workflows" title="Refresh">↻</button></div>
+          <div id="tasks-list" class="workflow-list">
+            <div class="workflow-empty">No tasks yet.</div>
+          </div>
+        </div>
+        <div class="workflow-card">
+          <div class="card-label">NOTES</div>
+          <div id="notes-list" class="workflow-list">
+            <div class="workflow-empty">No notes yet.</div>
+          </div>
         </div>
 
         <!-- Cohorts sidebar -->
