@@ -6,7 +6,8 @@ var BACKEND_URL;
 (function () {
   const isLocal = typeof window !== "undefined" && window.location.hostname === "localhost";
   const placeholder = "https://SET-BACKEND-URL-IN-INDEX-HTML";
-  const url = window.BACKEND_URL || (isLocal ? "http://localhost:8000" : placeholder);
+  const raw = window.BACKEND_URL || (isLocal ? "http://localhost:8000" : placeholder);
+  const url = String(raw).replace(/\/+$/, "");
   window.BACKEND_URL = url;
   BACKEND_URL = url;
   if (!isLocal && url === placeholder) {

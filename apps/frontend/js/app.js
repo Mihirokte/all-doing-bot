@@ -520,15 +520,40 @@ async function loadEntries(name, container) {
 // ── Backend health check ──────────────────────────────────
 async function checkBackend() {
   const el = document.getElementById("metric-backend");
+  const banner = document.getElementById("backend-banner");
+  const showBanner = function (text) {
+    if (!banner) return;
+    banner.textContent = text;
+    banner.classList.remove("hidden");
+  };
+  const hideBanner = function () {
+    if (banner) banner.classList.add("hidden");
+  };
   try {
-    await API.health();
-    el.textContent = "CONNECTED";
-    el.classList.add("online");
+    const data = await API.health();
+    const wf = data && data.api && data.api.workflows === true;
+    if (wf) {
+      el.textContent = "CONNECTED";
+      el.classList.add("online");
+      el.style.color = "";
+      hideBanner();
+    } else {
+      el.textContent = "NEEDS UPDATE";
+      el.classList.remove("online");
+      el.style.color = "var(--amber)";
+      showBanner(
+        "Backend is up but running an old build (no task/note workflow API). On EC2: " +
+          "cd ~/all-doing-bot && git pull origin main && source venv/bin/activate && " +
+          "pip install -r apps/backend/requirements.txt && sudo systemctl restart alldoing — then hard-refresh."
+      );
+    }
   } catch (e) {
     el.textContent = "OFFLINE";
+    el.classList.remove("online");
     el.style.color = "var(--red)";
     document.getElementById("sys-status").textContent = "DEGRADED";
     document.getElementById("sys-status").style.color = "var(--amber)";
+    showBanner("Backend unreachable. Check EC2, security group, and BACKEND_URL in index.html. " + (e.message || e));
   }
 }
 

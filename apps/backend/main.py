@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from typing import Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -111,9 +112,15 @@ app.add_middleware(
 
 
 @app.get("/health")
-def health() -> dict[str, str]:
-    """Health check for monitoring and cron."""
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    """Health check for monitoring and cron. `api.workflows` signals task/note workflow routes exist."""
+    return {
+        "status": "ok",
+        "api": {
+            "workflows": True,
+            "version": "2026.03-workflows",
+        },
+    }
 
 
 def _chat_looks_like_search(query: str) -> bool:
@@ -378,9 +385,7 @@ async def list_cohorts() -> list[CohortInfo]:
     ]
 
 
-@app.post("/workflows/task", response_model=WorkflowSaveResponse)
-async def workflow_add_task(body: WorkflowSaveBody) -> WorkflowSaveResponse:
-    """Deterministic: save one task row (Sheets cohort per session_key). No LLM."""
+async def _workflow_save_task(body: WorkflowSaveBody) -> WorkflowSaveResponse:
     from apps.backend.workflows.handlers import append_item
 
     sk = (body.session_key or "default").strip() or "default"
@@ -395,9 +400,7 @@ async def workflow_add_task(body: WorkflowSaveBody) -> WorkflowSaveResponse:
     )
 
 
-@app.post("/workflows/note", response_model=WorkflowSaveResponse)
-async def workflow_add_note(body: WorkflowSaveBody) -> WorkflowSaveResponse:
-    """Deterministic: save one note row. No LLM."""
+async def _workflow_save_note(body: WorkflowSaveBody) -> WorkflowSaveResponse:
     from apps.backend.workflows.handlers import append_item
 
     sk = (body.session_key or "default").strip() or "default"
@@ -412,8 +415,7 @@ async def workflow_add_note(body: WorkflowSaveBody) -> WorkflowSaveResponse:
     )
 
 
-@app.get("/workflows/tasks", response_model=list[WorkflowItem])
-async def workflow_list_tasks(session_key: str = "default", limit: int = 50) -> list[WorkflowItem]:
+async def _workflow_list_tasks(session_key: str, limit: int) -> list[WorkflowItem]:
     from apps.backend.workflows.handlers import list_items
 
     sk = (session_key or "default").strip() or "default"
@@ -421,13 +423,39 @@ async def workflow_list_tasks(session_key: str = "default", limit: int = 50) -> 
     return [WorkflowItem(entry_id=r["entry_id"], content=r["content"], created_at=r["created_at"]) for r in rows]
 
 
-@app.get("/workflows/notes", response_model=list[WorkflowItem])
-async def workflow_list_notes(session_key: str = "default", limit: int = 50) -> list[WorkflowItem]:
+async def _workflow_list_notes(session_key: str, limit: int) -> list[WorkflowItem]:
     from apps.backend.workflows.handlers import list_items
 
     sk = (session_key or "default").strip() or "default"
     rows = await list_items(sk, "notes", limit=min(max(1, limit), 200))
     return [WorkflowItem(entry_id=r["entry_id"], content=r["content"], created_at=r["created_at"]) for r in rows]
+
+
+# Primary paths + /api/v1 aliases (some proxies only forward /api/*).
+@app.post("/workflows/task", response_model=WorkflowSaveResponse)
+@app.post("/api/v1/workflow/task", response_model=WorkflowSaveResponse)
+async def workflow_add_task(body: WorkflowSaveBody) -> WorkflowSaveResponse:
+    """Deterministic: save one task row (Sheets cohort per session_key). No LLM."""
+    return await _workflow_save_task(body)
+
+
+@app.post("/workflows/note", response_model=WorkflowSaveResponse)
+@app.post("/api/v1/workflow/note", response_model=WorkflowSaveResponse)
+async def workflow_add_note(body: WorkflowSaveBody) -> WorkflowSaveResponse:
+    """Deterministic: save one note row. No LLM."""
+    return await _workflow_save_note(body)
+
+
+@app.get("/workflows/tasks", response_model=list[WorkflowItem])
+@app.get("/api/v1/workflow/tasks", response_model=list[WorkflowItem])
+async def workflow_list_tasks(session_key: str = "default", limit: int = 50) -> list[WorkflowItem]:
+    return await _workflow_list_tasks(session_key, limit)
+
+
+@app.get("/workflows/notes", response_model=list[WorkflowItem])
+@app.get("/api/v1/workflow/notes", response_model=list[WorkflowItem])
+async def workflow_list_notes(session_key: str = "default", limit: int = 50) -> list[WorkflowItem]:
+    return await _workflow_list_notes(session_key, limit)
 
 
 @app.get("/cohort/{name}", response_model=list[CohortEntry])

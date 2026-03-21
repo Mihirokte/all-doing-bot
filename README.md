@@ -79,6 +79,16 @@ python -m pytest tests -q
 
 Regressive checks (no test files): start backend, then `curl http://localhost:8000/health`, `curl "http://localhost:8000/query?q=..."`, and poll `GET /status/<task_id>` until completed.
 
+## EC2: one-command update (fix “Not Found” on tasks/notes)
+
+If the UI shows **Load failed** or **`Not Found`** on notes/tasks, the instance is usually on **old code**. SSH in and run:
+
+```bash
+bash /home/ubuntu/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh
+```
+
+(or `git pull`, `pip install -r apps/backend/requirements.txt`, `sudo systemctl restart alldoing` manually). After deploy, `GET /health` includes `"api":{"workflows":true,...}`.
+
 ## Quick workflows (UI) + session
 
 The frontend **Quick workflow** row has three modes:
