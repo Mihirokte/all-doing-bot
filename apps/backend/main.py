@@ -61,6 +61,19 @@ async def _ensure_english_response(text: str) -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup: log LLM/persistence mode; shutdown: cancel background tasks."""
+    import sys
+
+    if sys.version_info < (3, 10):
+        logger.critical("Python 3.10+ is required (langgraph, mcp). Current: %s", sys.version)
+        raise SystemExit(1)
+    try:
+        import langgraph  # noqa: F401
+        import mcp  # noqa: F401
+    except ImportError as e:
+        logger.critical("Required packages missing: langgraph, mcp. pip install -r apps/backend/requirements.txt — %s", e)
+        raise SystemExit(1) from e
+    logger.info("Required stack OK: LangGraph + MCP packages importable")
+
     # LLM provider resolution
     logger.info("LLM provider order: %s", settings.llm_provider_order)
     if settings.ollama_base_url and settings.ollama_model:

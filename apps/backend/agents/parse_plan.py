@@ -55,15 +55,24 @@ def _compiled_graph():
     return _compiled
 
 
+async def _run_parse_then_plan_sequential(query: str) -> tuple[ParsedIntent | None, PlanOutput | None]:
+    """Emergency fallback if LangGraph invoke fails (LLM/network); same two structured steps."""
+    from apps.backend.pipeline.stages import run_parse, run_plan
+
+    parsed = await run_parse(query)
+    if parsed is None:
+        return None, None
+    plan = await run_plan(parsed)
+    return parsed, plan
+
+
 async def run_parse_plan_langgraph(query: str) -> tuple[ParsedIntent | None, PlanOutput | None]:
-    """Run parse -> plan pipeline as a small LangGraph."""
+    """Run parse -> plan through LangGraph (required dependency). Falls back to sequential only on graph runtime errors."""
     try:
         out = await _compiled_graph().ainvoke({"query": query})
     except Exception as e:  # noqa: BLE001
-        logger.warning("LangGraph parse/plan failed, falling back to combined call: %s", e)
-        from apps.backend.pipeline.stages import run_parse_and_plan
-
-        return await run_parse_and_plan(query)
+        logger.warning("LangGraph invoke failed, falling back to sequential parse+plan: %s", e)
+        return await _run_parse_then_plan_sequential(query)
 
     parsed = out.get("parsed")
     plan = out.get("plan")

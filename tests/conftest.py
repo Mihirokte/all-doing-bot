@@ -1,16 +1,8 @@
-"""Pytest fixtures. Run from repo root with PYTHONPATH=."""
-import sys
-from pathlib import Path
+"""Force MCP env before Settings() loads so tests pass even if .env omits MCP (required when provider=mcp)."""
 
-# Ensure repo root is on path so backend package is found
-root = Path(__file__).resolve().parent.parent
-if str(root) not in sys.path:
-    sys.path.insert(0, str(root))
+from __future__ import annotations
 
-from fastapi.testclient import TestClient
+import os
 
-from apps.backend.main import app
-
-
-def client() -> TestClient:
-    return TestClient(app)
+# Must win over .env / empty env: default provider is mcp and Settings validates non-empty argv.
+os.environ["MCP_SEARCH_COMMAND_JSON"] = '["echo","all-doing-bot-test-placeholder"]'

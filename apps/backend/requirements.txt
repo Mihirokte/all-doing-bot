@@ -1,4 +1,4 @@
-# Phase 1 — Core backend
+# Backend requires Python 3.10+ (langgraph, mcp).
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 pydantic>=2.5.0

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Run ON the EC2 instance (ubuntu) after SSH. Updates repo, deps, restarts alldoing.
+# Use a Python 3.10+ venv: langgraph and mcp require 3.10+.
 set -euo pipefail
 cd /home/ubuntu/all-doing-bot
 git fetch origin main

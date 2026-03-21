@@ -20,7 +20,6 @@ from apps.backend.models.schemas import ParsedIntent, PlanOutput, PlanStep, Task
 from apps.backend.orchestration.events import StepCompletedPayload, StepDispatchedPayload
 from apps.backend.orchestration.queue import get_queue
 from apps.backend.orchestration.run_state import set_run_meta, update_run_status
-from apps.backend.pipeline.stages import run_parse_and_plan
 from apps.backend.pipeline.task_store import task_store
 from apps.backend.telemetry import log_policy_decision, log_run_event, set_run_context
 
@@ -336,12 +335,9 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
         memory_prompt = "\n".join(memory_lines).strip()
         query_with_memory = query if not memory_prompt else f"{query}\n\n[Memory Context]\n{memory_prompt}"
 
-        if settings.langgraph_parse_plan:
-            from apps.backend.agents.parse_plan import run_parse_plan_langgraph
+        from apps.backend.agents.parse_plan import run_parse_plan_langgraph
 
-            parsed, plan = await run_parse_plan_langgraph(query_with_memory)
-        else:
-            parsed, plan = await run_parse_and_plan(query_with_memory)
+        parsed, plan = await run_parse_plan_langgraph(query_with_memory)
         if not parsed:
             log_run_event("run_failed", run_id=task_id, stage="parse", outcome="fail", error="Parse+plan stage failed: no valid JSON")
             task_store.set_failed(task_id, "Parse+plan stage failed: no valid JSON")

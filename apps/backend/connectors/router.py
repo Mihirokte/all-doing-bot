@@ -27,10 +27,8 @@ class ConnectorRouter:
     """Select and execute connector providers by capability."""
 
     def __init__(self) -> None:
-        search_chain: list[BaseConnector] = []
-        if settings.mcp_search_argv:
-            search_chain.append(McpSearchConnector())
-        search_chain.append(SearxngSearchConnector())
+        # MCP is always registered (required stack); SearXNG remains available via provider hint or CONNECTOR_SEARCH_DEFAULT_PROVIDER=searxng.
+        search_chain: list[BaseConnector] = [McpSearchConnector(), SearxngSearchConnector()]
         self._connectors: dict[str, list[BaseConnector]] = {
             "search_web": search_chain,
             "web_fetch": [CloudflareFetchConnector(), ExtractorFetchConnector()],
@@ -72,10 +70,7 @@ class ConnectorRouter:
     @staticmethod
     def _default_provider_for(capability_id: str) -> str:
         if capability_id == "search_web":
-            sd = str(getattr(settings, "connector_search_default_provider", "searxng")).strip().lower()
-            if sd == "mcp" and not settings.mcp_search_argv:
-                sd = "searxng"
-            return sd
+            return str(getattr(settings, "connector_search_default_provider", "mcp")).strip().lower()
         defaults = {
             "web_fetch": str(getattr(settings, "connector_fetch_default_provider", "cloudflare")),
             "browser_automation": str(getattr(settings, "connector_browser_default_provider", "cloudflare_browser")),

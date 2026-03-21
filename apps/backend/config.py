@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -63,15 +63,12 @@ class Settings(BaseSettings):
     # Queue orchestration tuning.
     queue_step_poll_interval_seconds: float = 1.5
     queue_step_poll_timeout_seconds: float = 300.0
-    # Connector/provider defaults. Use "mcp" + MCP_SEARCH_COMMAND_JSON for MCP-only search (no vendor search HTTP APIs).
-    connector_search_default_provider: str = "searxng"
-    # JSON array of strings: e.g. '["npx","-y","@modelcontextprotocol/server-brave-search"]' (example only; pick your MCP server).
+    # Search: default is MCP (required stack). Set CONNECTOR_SEARCH_DEFAULT_PROVIDER=searxng only if you intentionally use SearXNG instead.
+    connector_search_default_provider: str = "mcp"
+    # Required when provider is mcp: JSON array of argv to start your MCP server (stdio), e.g. '["npx","-y","your-mcp-server"]'.
     mcp_search_command_json: str = ""
     mcp_search_tool_name: str = "search"
-    # Argument name for the search query when calling the MCP tool (many servers use "query" or "q").
     mcp_search_query_param: str = "query"
-    # When True, run parse then plan as two LangGraph nodes (two LLM calls) instead of one combined call.
-    langgraph_parse_plan: bool = True
     connector_fetch_default_provider: str = "cloudflare"
     connector_browser_default_provider: str = "cloudflare_browser"
     # Policy engine (CSV lists).
@@ -121,6 +118,17 @@ class Settings(BaseSettings):
         if not isinstance(v, list) or not v or not all(isinstance(x, str) for x in v):
             return []
         return list(v)
+
+    @model_validator(mode="after")
+    def _require_mcp_argv_when_mcp_provider(self) -> Settings:
+        prov = (self.connector_search_default_provider or "").strip().lower()
+        if prov == "mcp" and not self.mcp_search_argv:
+            raise ValueError(
+                "CONNECTOR_SEARCH_DEFAULT_PROVIDER is mcp but MCP_SEARCH_COMMAND_JSON is missing or invalid. "
+                "Set MCP_SEARCH_COMMAND_JSON to a JSON array of command argv, e.g. "
+                '[\"npx\",\"-y\",\"@your/mcp-server\"].'
+            )
+        return self
 
 
 settings = Settings()

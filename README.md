@@ -2,6 +2,8 @@
 
 `all-doing-bot` is a personal, always-on LLM-powered automation bot that turns natural-language requests into structured pipelines. A query is parsed into a cohort and an action, executed through a staged backend pipeline, and stored in Google Sheets.
 
+**Backend runtime:** Python **3.10+** (required for `langgraph` and `mcp`). Install deps with `pip install -r apps/backend/requirements.txt`.
+
 ## Architecture
 
 ```text
@@ -79,6 +81,15 @@ python -m pytest tests -q
 
 Regressive checks (no test files): start backend, then `curl http://localhost:8000/health`, `curl "http://localhost:8000/query?q=..."`, and poll `GET /status/<task_id>` until completed.
 
+## Go live (frontend + backend)
+
+1. **Push `main`** — Triggers **Deploy GitHub Pages (frontend)** (`.github/workflows/deploy-pages.yml`). The UI is served from `https://<user>.github.io/<repo>/` (configure Pages: branch `gh-pages`, root `/`).
+2. **`apps/frontend/index.html`** — Set `window.BACKEND_URL` to your public API (e.g. `https://54-165-94-30.sslip.io`), then push again so Pages picks it up.
+3. **Backend on EC2** — Use either:
+   - **GitHub Actions** (`.github/workflows/deploy-ec2.yml`): add secrets **`EC2_HOST`**, **`EC2_USER`** (e.g. `ubuntu`), **`EC2_SSH_KEY`** (private key PEM). Optionally set repo variable **`EC2_AUTO_DEPLOY`** = `true` to run deploy on every push to `main`; otherwise use **Actions → Deploy backend (EC2) → Run workflow** after each push.
+   - **SSH on the box**: `bash /home/ubuntu/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh`
+4. **EC2 `.env`** — Python **3.10+** venv, `pip install -r apps/backend/requirements.txt`, **`MCP_SEARCH_COMMAND_JSON`** set, **`CORS_ALLOW_ORIGINS`** includes your GitHub Pages origin (see table below).
+
 ## EC2: one-command update (fix “Not Found” on tasks/notes)
 
 If the UI shows **Load failed** or **`Not Found`** on notes/tasks, the instance is usually on **old code**. SSH in and run:
@@ -100,17 +111,17 @@ The frontend **Quick workflow** row has three modes:
 
 ## Parse/plan orchestration (LangGraph)
 
-When `LANGGRAPH_PARSE_PLAN=true` (default), the long pipeline runs **parse** then **plan** as two LLM calls in a small LangGraph (`apps/backend/agents/parse_plan.py`) instead of one combined JSON call. On graph failure it falls back to the legacy combined call.
+The long pipeline always runs **parse** then **plan** as two LLM calls through LangGraph (`apps/backend/agents/parse_plan.py`). If the graph invoke fails at runtime, the backend falls back to the same two steps sequentially (still separate parse + plan, not one mega JSON).
 
-## Web search via MCP (optional)
+## Web search via MCP (required configuration)
 
-To use a **local MCP server** for `search_web` (no vendor search REST API in-app):
+Default web search uses a **local MCP server** (stdio) — no in-app vendor search REST APIs.
 
-1. Set `CONNECTOR_SEARCH_DEFAULT_PROVIDER=mcp`.
-2. Set `MCP_SEARCH_COMMAND_JSON` to a JSON array of argv, e.g. `["npx","-y","your-mcp-package"]` (depends on the server you run).
-3. Set `MCP_SEARCH_TOOL_NAME` (and optionally `MCP_SEARCH_QUERY_PARAM`) to match that server’s tool schema.
+1. Set `CONNECTOR_SEARCH_DEFAULT_PROVIDER=mcp` (default).
+2. Set **`MCP_SEARCH_COMMAND_JSON`** to a JSON array of argv to start your MCP server, e.g. `["npx","-y","your-mcp-package"]`.
+3. Set `MCP_SEARCH_TOOL_NAME` and `MCP_SEARCH_QUERY_PARAM` to match that server’s tool schema.
 
-If MCP is not configured or `CONNECTOR_SEARCH_DEFAULT_PROVIDER=searxng`, behavior stays on SearXNG (`WebSearchAction`).
+To use **SearXNG** instead, set `CONNECTOR_SEARCH_DEFAULT_PROVIDER=searxng` (MCP argv is then not required by validation).
 
 ## Environment variables
 
@@ -124,12 +135,11 @@ For real LLM output and real persistence, configure the backend via a `.env` fil
 | `LLM_PROVIDER_PRIORITY` | No | Comma-separated provider order (default: `ollama,local,mock` for no-key local Qwen runtime). |
 | `GOOGLE_CREDS_PATH` | For real persistence | Path to Google service account JSON. If unset, backend uses in-memory fake persistence. |
 | `SPREADSHEET_ID` | For real persistence | Google Sheet ID for catalogue and cohort data. |
-| `CHAT_WEB_SEARCH_ENABLED` | No | Set to `true` to enable web search for short search-like queries (requires SearXNG or MCP search). Default: disabled. |
-| `LANGGRAPH_PARSE_PLAN` | No | Default `true`. Use LangGraph for separate parse + plan LLM steps. |
-| `CONNECTOR_SEARCH_DEFAULT_PROVIDER` | No | `searxng` (default) or `mcp` when MCP search is configured. |
-| `MCP_SEARCH_COMMAND_JSON` | For MCP search | JSON array of command argv to start the MCP server (stdio). |
-| `MCP_SEARCH_TOOL_NAME` | For MCP search | Tool name to call (default `search`). |
-| `MCP_SEARCH_QUERY_PARAM` | For MCP search | Argument key for the query (default `query`). |
+| `CHAT_WEB_SEARCH_ENABLED` | No | Set to `true` to enable web search for short search-like queries (uses default search provider: MCP or SearXNG). Default: disabled. |
+| `CONNECTOR_SEARCH_DEFAULT_PROVIDER` | No | Default `mcp`. Set `searxng` to use SearXNG as the default search backend. |
+| `MCP_SEARCH_COMMAND_JSON` | **Yes** when provider is `mcp` | JSON array of command argv to start the MCP server (stdio). |
+| `MCP_SEARCH_TOOL_NAME` | No | Tool name to call (default `search`). |
+| `MCP_SEARCH_QUERY_PARAM` | No | Argument key for the query (default `query`). |
 | `REDIS_URL` | For queue | When set, pipeline enqueues steps to Redis; run a worker to process them (`python -m apps.backend.workers.run_worker`). Enables durable run state. |
 | `ORCHESTRATOR_LEGACY_FALLBACK_ENABLED` | No | Default `false`. If `true`, fall back to legacy in-process execution only when queue path fails. |
 | `CORS_ALLOW_ORIGINS` | No | Comma-separated origins for CORS (e.g. `http://localhost:3000`). |
