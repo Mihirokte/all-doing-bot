@@ -1,0 +1,72 @@
+================================================================================
+AUTO BACKEND UPDATE — GitHub Actions → EC2 (all-doing-bot)
+================================================================================
+
+WHAT IT DOES
+  Workflow: .github/workflows/deploy-ec2.yml
+  On every push to main (if enabled) OR when you click "Run workflow":
+    SSH → cd /home/$USER/all-doing-bot → git pull → pip install → restart alldoing
+
+--------------------------------------------------------------------------------
+STEP 1 — GitHub repository secrets (Settings → Secrets and variables → Actions)
+--------------------------------------------------------------------------------
+Create these SECRETS (name exact):
+
+  EC2_HOST
+    Value (your instance — use one):
+      ec2-54-165-94-30.compute-1.amazonaws.com
+      OR
+      54.165.94.30
+
+  EC2_USER
+    Value:
+      ec2-user
+
+  EC2_SSH_KEY
+    Value:
+      Full contents of your PRIVATE key file (the one WITHOUT .pub), e.g. on Windows:
+        %USERPROFILE%\.ssh\alldoing_ec2
+      Paste entire block including:
+        -----BEGIN OPENSSH PRIVATE KEY-----
+        ...
+        -----END OPENSSH PRIVATE KEY-----
+      Do NOT commit this file. Do NOT paste the key into this .txt file.
+
+--------------------------------------------------------------------------------
+STEP 2 — Repository variable (auto-deploy on every push to main)
+--------------------------------------------------------------------------------
+Settings → Secrets and variables → Actions → Variables tab → New repository variable
+
+  Name:   EC2_AUTO_DEPLOY
+  Value:  true
+
+  Without this variable, the workflow only runs when you manually:
+    Actions → "Deploy backend (EC2)" → Run workflow
+
+--------------------------------------------------------------------------------
+VALUES EXTRACTED FOR YOUR CURRENT EC2 (reference only)
+--------------------------------------------------------------------------------
+  AMI / user:        Amazon Linux 2023 → SSH user ec2-user (not ubuntu)
+  Public DNS:        ec2-54-165-94-30.compute-1.amazonaws.com
+  Public IP:         54.165.94.30
+  HTTPS frontend:    https://54-165-94-30.sslip.io  (points at same host)
+  Repo on server:    /home/ec2-user/all-doing-bot
+  Systemd service:   alldoing
+  Python on server:  venv must be 3.10+ (you have 3.11 in ~/all-doing-bot/venv)
+
+--------------------------------------------------------------------------------
+SECURITY GROUP REMINDER
+--------------------------------------------------------------------------------
+  GitHub Actions runners use changing public IPs. For auto-deploy via SSH you need
+  either:
+    - Security group inbound SSH (22) from 0.0.0.0/0 (simple, weaker), OR
+    - A tighter approach: only workflow_dispatch (delete EC2_AUTO_DEPLOY) and run
+      deploy when your IP can SSH, OR use AWS SSM / self-hosted runner instead of SSH.
+
+--------------------------------------------------------------------------------
+QUICK VERIFY AFTER FIRST RUN
+--------------------------------------------------------------------------------
+  Actions tab → latest "Deploy backend (EC2)" → green check
+  Browser or curl:  https://54-165-94-30.sslip.io/health
+
+================================================================================
