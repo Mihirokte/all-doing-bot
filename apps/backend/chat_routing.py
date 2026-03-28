@@ -13,34 +13,38 @@ logger = logging.getLogger(__name__)
 _CHAT_ROUTE_MARKER = "chat_web_route_v1"
 
 
-def prompt_chat_web_route(user_message: str) -> str:
+def prompt_chat_web_route(user_message: str, conversation_context: str = "") -> str:
     q = (user_message or "").strip()
+    prior = (conversation_context or "").strip()
+    prior_block = f"\nPrior conversation (chronological, oldest first):\n{prior}\n" if prior else ""
     return f"""{_CHAT_ROUTE_MARKER}
-You route ONE user message for a careful assistant. Reply with JSON ONLY matching this shape:
+You route the CURRENT user message for a careful assistant. Reply with JSON ONLY matching this shape:
 {{"needs_web": boolean, "ask_user_first": boolean, "ask_user_message": string, "search_query": string}}
-
+{prior_block}
 Definitions:
 - needs_web: true if a good answer normally requires verifiable or up-to-date external facts (movie/show/game reviews or cast, news, sports results, product specs, niche biographies, "is X true", release dates, prices). false for stable general knowledge (e.g. capitals of well-known countries), math, logic, pure coding, creative writing, obvious metaphors/jokes with no factual claim, or vague philosophy.
-- ask_user_first: true if the message is too vague to search (mostly pronouns like "it/this/that" with no clear topic, or asking for reviews/details but NO title/name). When true, set needs_web to false and put one short clarifying question in ask_user_message.
-- ask_user_message: non-empty only when ask_user_first is true.
-- search_query: when needs_web is true and ask_user_first is false, a concise web-search query (under 120 characters) with real entity names and year if relevant. Do NOT use the whole vague chat sentence as the query. If the user message is garbage or not a real question, set needs_web false.
+- ask_user_first: true only if the CURRENT message is too vague to search AND the prior conversation does NOT supply a clear topic (e.g. pronouns like "it/this" with no entity in prior turns). If prior turns name a movie/product/person, resolve references and set ask_user_first false.
+- ask_user_message: non-empty only when ask_user_first is true (one short clarifying question).
+- search_query: when needs_web is true and ask_user_first is false, a concise web-search query (under 120 characters) with real entity names and year if relevant. Merge context from prior turns (e.g. user previously said "Dhurandhar 2" and now says "2026 reviews" -> search_query "Dhurandhar 2 movie reviews 2026"). Do NOT paste vague chat as the query.
 
-Examples:
+Examples (no prior):
 - "capital of France" -> {{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}}
 - "capital of my heart" -> {{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}}
-- "reviews of Dhurandhar 2 movie" -> {{"needs_web": true, "ask_user_first": false, "ask_user_message": "", "search_query": "Dhurandhar 2 movie reviews 2026"}}
-- "it's a latest 2026 moview" -> {{"needs_web": false, "ask_user_first": true, "ask_user_message": "Which movie should I look up? Please send the exact title.", "search_query": ""}}
+- "reviews of Dhurandhar 2 movie" -> {{"needs_web": true, "ask_user_first": false, "ask_user_message": "", "search_query": "Dhurandhar 2 movie reviews"}}
 
-User message:
+Examples (with prior):
+- Prior includes User: reviews of Dhurandhar 2. Current: "it's the 2026 film" -> {{"needs_web": true, "ask_user_first": false, "ask_user_message": "", "search_query": "Dhurandhar 2 2026 movie reviews"}}
+
+Current user message:
 {q}
 """
 
 
-async def run_chat_web_route(user_message: str) -> ChatWebRoute | None:
+async def run_chat_web_route(user_message: str, conversation_context: str = "") -> ChatWebRoute | None:
     if not getattr(settings, "chat_web_gate_enabled", True):
         return None
     llm = get_llm()
-    prompt = prompt_chat_web_route(user_message)
+    prompt = prompt_chat_web_route(user_message, conversation_context)
     try:
         out = await llm.generate_structured(prompt, ChatWebRoute, max_retries=1)
         if out is None:

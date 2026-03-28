@@ -136,7 +136,7 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "api": {
             "workflows": True,
-            "version": "2026.03-chat-gate",
+            "version": "2026.03-chat-transcript",
         },
     }
 
@@ -363,27 +363,36 @@ async def _chat_retrieval_stack(search_q: str, display_q: str, detailed_search: 
 
 
 @app.get("/chat")
-async def chat(q: str = "") -> dict[str, str]:
+async def chat(q: str = "", session_key: str = "default") -> dict[str, str]:
     """
-    Short-query path: structured gate (web vs direct), refined search queries, anti-hallucination prompt.
+    Short-query path: session-scoped transcript (Sheets + memory), structured gate, web vs direct.
+    Frontend should pass session_key (same as workflows) so follow-ups resolve entities.
     """
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
     if len(q) > 10000:
         raise HTTPException(status_code=400, detail="Query too long (max 10000 characters)")
     from apps.backend.chat_routing import run_chat_web_route
+    from apps.backend.db.chat_transcript import load_transcript_for_prompt, persist_chat_exchange
     from apps.backend.llm.engine import get_llm
     from apps.backend.models.schemas import ChatWebRoute
 
+    sk = (session_key or "default").strip() or "default"
     query = q.strip()
     detailed_search = _search_wants_detail(query)
+    prior = await load_transcript_for_prompt(sk)
 
-    route = await run_chat_web_route(query)
+    route = await run_chat_web_route(query, prior)
     if route is None:
         route = ChatWebRoute()
 
+    async def _reply(assistant_text: str) -> dict[str, str]:
+        normalized = await _ensure_english_response((assistant_text or "").strip())
+        await persist_chat_exchange(sk, query, normalized)
+        return {"response": normalized}
+
     if route.ask_user_first and (route.ask_user_message or "").strip():
-        return {"response": (route.ask_user_message or "").strip()}
+        return await _reply((route.ask_user_message or "").strip())
 
     heuristic_search = _chat_looks_like_search(query)
     effective_web = bool(route.needs_web or heuristic_search)
@@ -391,28 +400,25 @@ async def chat(q: str = "") -> dict[str, str]:
 
     if effective_web:
         if not getattr(settings, "chat_web_search_enabled", False):
-            return {
-                "response": (
-                    "I would need live web search to answer that without guessing, "
-                    "but CHAT_WEB_SEARCH_ENABLED is off on this server. "
-                    "Turn it on in the backend environment, or use a host where search is enabled."
-                )
-            }
+            return await _reply(
+                "I would need live web search to answer that without guessing, "
+                "but CHAT_WEB_SEARCH_ENABLED is off on this server. "
+                "Turn it on in the backend environment, or use a host where search is enabled."
+            )
         try:
             text = await _chat_retrieval_stack(search_q, query, detailed_search)
         except Exception as e:  # noqa: BLE001
             logger.warning("Chat web retrieval failed: %s", e)
             text = None
         if text:
-            return {"response": await _ensure_english_response(text)}
-        return {
-            "response": (
-                "Web search did not return usable results. "
-                "Try a more specific query with a full name, title, year, or product name."
-            )
-        }
+            return await _reply(text)
+        return await _reply(
+            "Web search did not return usable results. "
+            "Try a more specific query with a full name, title, year, or product name."
+        )
 
     llm = get_llm()
+    ctx = f"Prior conversation:\n{prior}\n\n" if prior else ""
     prompt = (
         "You are a careful assistant.\n"
         "Answer in English only, in 2-4 short sentences. Do not use markdown or bullet lists.\n"
@@ -420,11 +426,12 @@ async def chat(q: str = "") -> dict[str, str]:
         "statistics, reviews, box office numbers, or current events.\n"
         "If the question needs fresh news or niche facts you cannot verify from general knowledge, "
         "say you cannot confirm without a web search.\n"
-        f"Question: {query}"
+        "Use the prior conversation to interpret follow-ups (e.g. \"it\" / \"that movie\").\n"
+        f"{ctx}Current question: {query}"
     )
     try:
         response = await llm.generate(prompt, max_tokens=220, json_mode=False)
-        return {"response": await _ensure_english_response((response or "").strip())}
+        return await _reply((response or "").strip())
     except Exception as e:
         logger.warning("Chat LLM failed: %s", e)
         raise HTTPException(status_code=503, detail="LLM unavailable for chat")

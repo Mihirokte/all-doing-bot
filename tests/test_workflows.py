@@ -10,6 +10,8 @@ def test_cohort_for_stable_per_session() -> None:
     assert cohort_for("user-a", "tasks") == cohort_for("user-a", "tasks")
     assert cohort_for("user-a", "tasks") != cohort_for("user-b", "tasks")
     assert cohort_for("user-a", "tasks") != cohort_for("user-a", "notes")
+    assert cohort_for("user-a", "chat").startswith("wf_chat_")
+    assert cohort_for("user-a", "chat") != cohort_for("user-a", "tasks")
 
 
 def test_append_and_list_task() -> None:

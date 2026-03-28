@@ -24,11 +24,19 @@ def _digest(session_key: str) -> str:
 
 def cohort_for(session_key: str, kind: str) -> str:
     """Stable cohort name for Google Sheet tab (ASCII, short)."""
-    k = "tasks" if kind == "tasks" else "notes"
-    return f"wf_{k}_{_digest(session_key)}"
+    h = _digest(session_key)
+    if kind == "tasks":
+        return f"wf_tasks_{h}"
+    if kind == "notes":
+        return f"wf_notes_{h}"
+    if kind == "chat":
+        return f"wf_chat_{h}"
+    raise ValueError(f"unknown workflow kind: {kind!r}")
 
 
 async def _ensure_workflow_cohort(session_key: str, kind: str, description: str) -> str:
+    if kind not in ("tasks", "notes", "chat"):
+        raise ValueError(f"unknown workflow kind: {kind!r}")
     name = cohort_for(session_key, kind)
     async with _workflow_lock:
         existing = await catalogue.get_cohort(name)
@@ -48,6 +56,15 @@ async def _ensure_workflow_cohort(session_key: str, kind: str, description: str)
             )
             logger.info("Created workflow cohort %s (%s)", name, kind)
     return name
+
+
+async def ensure_chat_cohort(session_key: str) -> str:
+    """Ensure per-session Ask-mode chat transcript sheet exists; return cohort name."""
+    return await _ensure_workflow_cohort(
+        session_key,
+        "chat",
+        "Ask-mode chat transcript (persists follow-ups per session)",
+    )
 
 
 async def append_item(session_key: str, kind: str, text: str) -> dict[str, Any]:
