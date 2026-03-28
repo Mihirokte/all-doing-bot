@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from apps.backend.config import settings
+from apps.backend.text_cleanup import sanitize_chat_evidence_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -279,7 +280,9 @@ async def handle_chat(query: str, session_key: str) -> dict[str, str]:
         route = ChatWebRoute()
 
     async def reply(assistant_text: str) -> dict[str, str]:
-        normalized = await ensure_english_response((assistant_text or "").strip())
+        cleaned = sanitize_chat_evidence_markdown((assistant_text or "").strip())
+        normalized = await ensure_english_response(cleaned)
+        normalized = sanitize_chat_evidence_markdown((normalized or "").strip())
         await persist_chat_exchange(sk, query, normalized)
         return {"response": normalized}
 
