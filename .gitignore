@@ -15,6 +15,9 @@ poke-tasks-433-*.json
 .DS_Store
 *.swp
 
+# Claude Code
+.claude/
+
 # Local junk (do not commit)
 AnyDesk.exe
 *.dll

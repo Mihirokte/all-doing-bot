@@ -55,13 +55,21 @@ def _compiled_graph():
     return _compiled
 
 
-async def _run_parse_then_plan_sequential(query: str) -> tuple[ParsedIntent | None, PlanOutput | None]:
-    """Emergency fallback if LangGraph invoke fails (LLM/network); same two structured steps."""
+async def _run_parse_then_plan_sequential(
+    query: str,
+    existing_parsed: ParsedIntent | None = None,
+) -> tuple[ParsedIntent | None, PlanOutput | None]:
+    """Emergency fallback if LangGraph invoke fails (LLM/network); same two structured steps.
+    If existing_parsed is provided (parse already succeeded), skip the parse stage."""
     from apps.backend.pipeline.stages import run_parse, run_plan
 
-    parsed = await run_parse(query)
+    parsed = existing_parsed
     if parsed is None:
-        return None, None
+        parsed = await run_parse(query)
+        if parsed is None:
+            return None, None
+    else:
+        logger.info("Fallback: reusing existing parse result, only re-running plan stage")
     plan = await run_plan(parsed)
     return parsed, plan
 
@@ -71,8 +79,23 @@ async def run_parse_plan_langgraph(query: str) -> tuple[ParsedIntent | None, Pla
     try:
         out = await _compiled_graph().ainvoke({"query": query})
     except Exception as e:  # noqa: BLE001
-        logger.warning("LangGraph invoke failed, falling back to sequential parse+plan: %s", e)
-        return await _run_parse_then_plan_sequential(query)
+        logger.error("LangGraph invoke failed: %s", e)
+        # Check if the graph partially completed (parse succeeded but plan failed)
+        partial_parsed: ParsedIntent | None = None
+        if hasattr(e, "__context__") and e.__context__:
+            logger.debug("LangGraph error context: %s", e.__context__)
+        # Try to extract partial state from the graph error if available
+        try:
+            graph = _compiled_graph()
+            # LangGraph may store partial state; attempt to retrieve it
+            if hasattr(graph, "get_state"):
+                state = graph.get_state({"query": query})
+                if state and isinstance(state.get("parsed"), ParsedIntent):
+                    partial_parsed = state["parsed"]
+                    logger.info("Recovered partial parse result from failed graph execution")
+        except Exception:  # noqa: BLE001
+            pass
+        return await _run_parse_then_plan_sequential(query, existing_parsed=partial_parsed)
 
     parsed = out.get("parsed")
     plan = out.get("plan")

@@ -1,6 +1,7 @@
 """Task / note persistence: one cohort per (session_key, kind) via stable hashed name."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -12,6 +13,8 @@ from apps.backend.db.models import Cohort, Entry
 from apps.backend.db.sheets import add_entries, list_cohort_entries
 
 logger = logging.getLogger(__name__)
+
+_workflow_lock = asyncio.Lock()
 
 
 def _digest(session_key: str) -> str:
@@ -27,22 +30,23 @@ def cohort_for(session_key: str, kind: str) -> str:
 
 async def _ensure_workflow_cohort(session_key: str, kind: str, description: str) -> str:
     name = cohort_for(session_key, kind)
-    existing = await catalogue.get_cohort(name)
-    now = datetime.now(timezone.utc).isoformat()
-    if existing is None:
-        await catalogue.create_cohort(
-            Cohort(
-                cohort_name=name,
-                cohort_description=description,
-                action_type="workflow_" + kind,
-                action_params=json.dumps({"session_digest": _digest(session_key)}),
-                created_at=now,
-                last_run=now,
-                sheet_name=name,
-                entry_count=0,
+    async with _workflow_lock:
+        existing = await catalogue.get_cohort(name)
+        now = datetime.now(timezone.utc).isoformat()
+        if existing is None:
+            await catalogue.create_cohort(
+                Cohort(
+                    cohort_name=name,
+                    cohort_description=description,
+                    action_type="workflow_" + kind,
+                    action_params=json.dumps({"session_digest": _digest(session_key)}),
+                    created_at=now,
+                    last_run=now,
+                    sheet_name=name,
+                    entry_count=0,
+                )
             )
-        )
-        logger.info("Created workflow cohort %s (%s)", name, kind)
+            logger.info("Created workflow cohort %s (%s)", name, kind)
     return name
 
 

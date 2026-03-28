@@ -337,10 +337,19 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
 
         from apps.backend.agents.parse_plan import run_parse_plan_langgraph
 
-        parsed, plan = await run_parse_plan_langgraph(query_with_memory)
+        try:
+            parsed, plan = await run_parse_plan_langgraph(query_with_memory)
+        except Exception as parse_plan_exc:
+            error_msg = f"Parse+plan stage exception: {parse_plan_exc}"
+            logger.error("Parse+plan failed for task %s: %s", task_id, parse_plan_exc)
+            log_run_event("run_failed", run_id=task_id, stage="parse", outcome="fail", error=error_msg)
+            task_store.set_failed(task_id, error_msg)
+            return
         if not parsed:
-            log_run_event("run_failed", run_id=task_id, stage="parse", outcome="fail", error="Parse+plan stage failed: no valid JSON")
-            task_store.set_failed(task_id, "Parse+plan stage failed: no valid JSON")
+            error_msg = "Parse+plan stage failed: no valid JSON returned from LLM"
+            logger.error("Parse+plan returned None for task %s", task_id)
+            log_run_event("run_failed", run_id=task_id, stage="parse", outcome="fail", error=error_msg)
+            task_store.set_failed(task_id, error_msg)
             return
         log_run_event("intent_parsed", run_id=task_id, stage="parse", outcome="ok", cohort_name=parsed.cohort_name, action_type=parsed.action_type)
         log_run_event("plan_ready", run_id=task_id, stage="plan", outcome="ok", step_count=len(plan.steps) if plan and plan.steps else 0)
@@ -365,10 +374,19 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
         cohort_name = parsed.cohort_name
         sheet_name = cohort_name
 
+        storage_ok = True
+        if entries:
+            try:
+                await add_entries(cohort_name, entries)
+            except Exception as storage_err:
+                storage_ok = False
+                logger.error("Failed to store %d entries for cohort %s: %s", len(entries), cohort_name, storage_err)
+
         from apps.backend.db.models import Cohort
 
         async with _cohort_lock:
             existing = await catalogue.get_cohort(cohort_name)
+            stored_count = len(entries) if storage_ok else 0
             if not existing:
                 await catalogue.create_cohort(
                     Cohort(
@@ -379,19 +397,19 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
                         created_at=now,
                         last_run=now,
                         sheet_name=sheet_name,
-                        entry_count=len(entries),
+                        entry_count=stored_count,
                     )
                 )
             else:
                 await catalogue.update_cohort(
-                    cohort_name, {"last_run": now, "entry_count": existing.entry_count + len(entries)}
+                    cohort_name, {"last_run": now, "entry_count": existing.entry_count + stored_count}
                 )
 
-        if entries:
-            await add_entries(cohort_name, entries)
-
         dead_letters = [s for s in steps_diagnostics if s.get("error")]
-        await update_run_status(task_id, "completed_with_dead_letters" if dead_letters else "completed")
+        if not storage_ok:
+            await update_run_status(task_id, "completed_with_warnings")
+        else:
+            await update_run_status(task_id, "completed_with_dead_letters" if dead_letters else "completed")
         log_run_event(
             "run_stored",
             run_id=task_id,

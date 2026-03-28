@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import List, Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -114,19 +117,70 @@ class Settings(BaseSettings):
         try:
             v = json.loads(raw)
         except json.JSONDecodeError:
+            logger.error(
+                "MCP_SEARCH_COMMAND_JSON is set but contains invalid JSON: %s",
+                raw[:200],
+            )
             return []
         if not isinstance(v, list) or not v or not all(isinstance(x, str) for x in v):
+            logger.error(
+                "MCP_SEARCH_COMMAND_JSON must be a JSON array of strings, got: %s",
+                type(v).__name__,
+            )
             return []
         return list(v)
 
+    @property
+    def configured_providers(self) -> List[str]:
+        """Return list of LLM providers that have their required env vars set."""
+        configured = []
+        # ollama has a default base URL, so it's always nominally configured
+        configured.append("ollama")
+        if self.model_path:
+            configured.append("local")
+        if self.remote_llm_api_key:
+            configured.append("remote")
+        return configured
+
     @model_validator(mode="after")
-    def _require_mcp_argv_when_mcp_provider(self) -> Settings:
+    def _validate_config(self) -> Settings:
+        # Validate MCP argv when MCP provider is selected
         prov = (self.connector_search_default_provider or "").strip().lower()
-        if prov == "mcp" and not self.mcp_search_argv:
-            raise ValueError(
-                "CONNECTOR_SEARCH_DEFAULT_PROVIDER is mcp but MCP_SEARCH_COMMAND_JSON is missing or invalid. "
-                "Set MCP_SEARCH_COMMAND_JSON to a JSON array of command argv, e.g. "
-                '[\"npx\",\"-y\",\"@your/mcp-server\"].'
+        if prov == "mcp":
+            raw = (self.mcp_search_command_json or "").strip()
+            if raw:
+                try:
+                    v = json.loads(raw)
+                except json.JSONDecodeError:
+                    raise ValueError(
+                        "MCP_SEARCH_COMMAND_JSON contains invalid JSON. "
+                        "Must be a JSON array of strings, e.g. "
+                        '[\"npx\",\"-y\",\"@your/mcp-server\"].'
+                    )
+                if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+                    raise ValueError(
+                        "MCP_SEARCH_COMMAND_JSON must be a JSON array of strings, "
+                        f"got {type(v).__name__}. Example: "
+                        '[\"npx\",\"-y\",\"@your/mcp-server\"].'
+                    )
+            if not self.mcp_search_argv:
+                raise ValueError(
+                    "CONNECTOR_SEARCH_DEFAULT_PROVIDER is mcp but MCP_SEARCH_COMMAND_JSON is missing or invalid. "
+                    "Set MCP_SEARCH_COMMAND_JSON to a JSON array of command argv, e.g. "
+                    '[\"npx\",\"-y\",\"@your/mcp-server\"].'
+                )
+        # Log provider configuration status
+        configured = self.configured_providers
+        requested = self.llm_provider_order
+        logger.info(
+            "LLM providers configured: %s | requested priority: %s",
+            configured, requested,
+        )
+        not_configured = [p for p in requested if p not in configured]
+        if not_configured:
+            logger.warning(
+                "Requested LLM providers not configured (missing env vars): %s",
+                not_configured,
             )
         return self
 

@@ -1,13 +1,24 @@
 /** ALL-DOING Intelligence Terminal — chat-style UI, smart routing by length */
 
 const CHAT_THRESHOLD = 100; // under this many chars: /chat (instant). else: /query (pipeline)
+const MAX_QUERY_LENGTH = 10000;
+const MAX_POLL_COUNT = 60;
 /** @type {"ask"|"task"|"note"} */
 let workflowMode = "ask";
 let queryCount = 0;
-let pollTimer = null;
 let thinkingMessageEl = null;
 let thinkingShownAtMs = 0;
 const MIN_THINKING_VISIBLE_MS = 900;
+
+// ── Abort / poll state ───────────────────────────────────
+/** @type {AbortController|null} */
+let activeAbortController = null;
+/** @type {boolean} */
+let pollRunning = false;
+
+// ── Interval tracking ────────────────────────────────────
+/** @type {number|null} */
+let clockIntervalId = null;
 
 // Short query is "search-like" (mirrors backend) → show deep retrieval status
 function looksLikeSearch(q) {
@@ -38,7 +49,15 @@ function initClock() {
     el.textContent = new Date().toISOString().replace("T", " ").slice(0, 19) + " UTC";
   }
   tick();
-  setInterval(tick, 1000);
+  if (clockIntervalId) clearInterval(clockIntervalId);
+  clockIntervalId = setInterval(tick, 1000);
+}
+
+function stopClock() {
+  if (clockIntervalId) {
+    clearInterval(clockIntervalId);
+    clockIntervalId = null;
+  }
 }
 
 // ── Quick workflow: Ask AI | Add task | Note it ────────────
@@ -67,15 +86,17 @@ async function loadWorkflowPanels() {
     const tasks = await API.listTasks(40);
     renderWorkflowList("tasks-list", tasks);
   } catch (e) {
+    console.error("Failed to load tasks:", e);
     const el = document.getElementById("tasks-list");
-    if (el) el.innerHTML = '<div class="workflow-empty" style="color:var(--red)">Load failed</div>';
+    if (el) el.innerHTML = '<div class="workflow-empty" style="color:var(--red)">Failed to load tasks: ' + escHtml(e.message || String(e)) + '</div>';
   }
   try {
     const notes = await API.listNotes(40);
     renderWorkflowList("notes-list", notes);
   } catch (e) {
+    console.error("Failed to load notes:", e);
     const el = document.getElementById("notes-list");
-    if (el) el.innerHTML = '<div class="workflow-empty" style="color:var(--red)">Load failed</div>';
+    if (el) el.innerHTML = '<div class="workflow-empty" style="color:var(--red)">Failed to load notes: ' + escHtml(e.message || String(e)) + '</div>';
   }
 }
 
@@ -91,6 +112,20 @@ function renderWorkflowList(elementId, items) {
     const body = escHtml((t.content || "").slice(0, 220));
     return '<div class="workflow-row"><span class="wf-ts">' + escHtml(ts) + '</span><div class="wf-body">' + body + "</div></div>";
   }).join("");
+}
+
+// ── Abort helpers ─────────────────────────────────────────
+function abortActiveRequest() {
+  if (activeAbortController) {
+    activeAbortController.abort();
+    activeAbortController = null;
+  }
+}
+
+function newAbortController() {
+  abortActiveRequest();
+  activeAbortController = new AbortController();
+  return activeAbortController;
 }
 
 // ── Query box: auto-clear on submit, smart routing ──────────
@@ -109,6 +144,20 @@ async function submitQuery() {
   const q = input.value.trim();
   if (!q) return;
 
+  // Prevent double-submission while processing
+  if (execBtn.disabled) return;
+
+  // Input validation: max query length
+  if (q.length > MAX_QUERY_LENGTH) {
+    appendMsg("assistant", "Error: Query is too long (" + q.length + " characters). Maximum allowed is " + MAX_QUERY_LENGTH + " characters.", true);
+    return;
+  }
+
+  // Abort any in-flight request from a previous submission
+  abortActiveRequest();
+  const controller = newAbortController();
+  const signal = controller.signal;
+
   // Auto-clear input immediately after submit
   input.value = "";
   execBtn.disabled = true;
@@ -120,13 +169,14 @@ async function submitQuery() {
     setTaskStatus("RUNNING", q);
     showTaskBadge(true);
     try {
-      const r = await API.addTask(q);
+      const r = await API.addTask(q, signal);
       const msg = (r && r.message) ? r.message : "Task saved.";
       appendMsg("assistant", r.ok ? msg : ("Error: " + (r.error || msg)), !r.ok);
       setTaskStatus(r.ok ? "COMPLETED" : "FAILED", q);
       await loadWorkflowPanels();
       await loadCohorts();
     } catch (e) {
+      if (signal.aborted) return; // Superseded by new request
       appendMsg("assistant", "Error: " + (e.message || e), true);
       setTaskStatus("FAILED", q);
     }
@@ -140,13 +190,14 @@ async function submitQuery() {
     setTaskStatus("RUNNING", q);
     showTaskBadge(true);
     try {
-      const r = await API.addNote(q);
+      const r = await API.addNote(q, signal);
       const msg = (r && r.message) ? r.message : "Note saved.";
       appendMsg("assistant", r.ok ? msg : ("Error: " + (r.error || msg)), !r.ok);
       setTaskStatus(r.ok ? "COMPLETED" : "FAILED", q);
       await loadWorkflowPanels();
       await loadCohorts();
     } catch (e) {
+      if (signal.aborted) return; // Superseded by new request
       appendMsg("assistant", "Error: " + (e.message || e), true);
       setTaskStatus("FAILED", q);
     }
@@ -163,13 +214,14 @@ async function submitQuery() {
     showTaskBadge(true);
     showThinkingIndicator("Thinking");
     try {
-      const data = await API.chat(q);
+      const data = await API.chat(q, signal);
       const responseText = (data.response || "").trim() || "No response.";
       await hideThinkingIndicator();
       appendMsg("assistant", responseText, false, null, true);
       setTaskStatus("COMPLETED", q);
     } catch (e) {
       await hideThinkingIndicator();
+      if (signal.aborted) return; // Superseded by new request
       appendMsg("assistant", "Error: " + (e.message || e), true);
       setTaskStatus("IDLE", "");
     }
@@ -186,10 +238,11 @@ async function submitQuery() {
   showTaskBadge(true);
   showThinkingIndicator("Researching");
   try {
-    const { task_id } = await API.submitQuery(q);
+    const { task_id } = await API.submitQuery(q, signal);
     document.getElementById("task-id-display").textContent = "TASK ID: " + task_id;
-    startPoll(task_id);
+    startPoll(task_id, signal);
   } catch (e) {
+    if (signal.aborted) return; // Superseded by new request
     appendMsg("result", "Submit failed: " + (e.message || e), true);
     resetTaskUI();
     execBtn.disabled = false;
@@ -197,41 +250,120 @@ async function submitQuery() {
   }
 }
 
-function startPoll(taskId) {
-  if (pollTimer) clearInterval(pollTimer);
-  pollTimer = setInterval(async () => {
-    try {
-      const d = await API.getStatus(taskId);
-      const s = d.status;
+/**
+ * Compute polling interval with backoff.
+ * Start at 2s, increase to 4s after 10 polls, then 8s after 20 polls.
+ */
+function getPollInterval(pollCount) {
+  if (pollCount >= 20) return 8000;
+  if (pollCount >= 10) return 4000;
+  return 2000;
+}
 
-      if (s === "completed") {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        await hideThinkingIndicator();
-        queryCount++;
-        document.getElementById("metric-queries").textContent = queryCount;
-        setTaskStatus("COMPLETED", d.query || "");
-        showProgressBar(false);
-        showTaskBadge(false);
-        appendMsg("result", formatResult(d.result), false, d.result);
-        loadCohorts();
-        loadWorkflowPanels();
-        resetInput();
-      } else if (s === "failed") {
-        clearInterval(pollTimer);
-        pollTimer = null;
-        await hideThinkingIndicator();
-        setTaskStatus("FAILED", d.query || "");
-        showProgressBar(false);
-        showTaskBadge(false);
-        const err = (d.result && d.result.error) ? d.result.error : "unknown error";
-        appendMsg("result", "Task failed: " + err, true);
-        resetInput();
+/**
+ * Async poll loop with AbortController support, backoff, max polls,
+ * and consecutive failure tolerance.
+ */
+async function startPoll(taskId, signal) {
+  // Only one poll loop at a time
+  if (pollRunning) return;
+  pollRunning = true;
+
+  let pollCount = 0;
+  let consecutiveFailures = 0;
+  const MAX_CONSECUTIVE_FAILURES = 3;
+
+  try {
+    while (pollCount < MAX_POLL_COUNT) {
+      // Check if aborted before sleeping
+      if (signal && signal.aborted) {
+        pollRunning = false;
+        return;
       }
-    } catch (e) {
-      appendMsg("result", "Poll error: " + (e.message || e), true);
+
+      // Wait with backoff
+      const interval = getPollInterval(pollCount);
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, interval);
+        if (signal) {
+          const onAbort = () => {
+            clearTimeout(timer);
+            resolve(); // Resolve so we can check abort at the top of the loop
+          };
+          signal.addEventListener("abort", onAbort, { once: true });
+        }
+      });
+
+      // Check again after sleep
+      if (signal && signal.aborted) {
+        pollRunning = false;
+        return;
+      }
+
+      pollCount++;
+
+      try {
+        const d = await API.getStatus(taskId, signal);
+        consecutiveFailures = 0; // reset on success
+        const s = d.status;
+
+        if (s === "completed") {
+          await hideThinkingIndicator();
+          queryCount++;
+          document.getElementById("metric-queries").textContent = queryCount;
+          setTaskStatus("COMPLETED", d.query || "");
+          showProgressBar(false);
+          showTaskBadge(false);
+          appendMsg("result", formatResult(d.result), false, d.result);
+          loadCohorts();
+          loadWorkflowPanels();
+          resetInput();
+          pollRunning = false;
+          return;
+        } else if (s === "failed") {
+          await hideThinkingIndicator();
+          setTaskStatus("FAILED", d.query || "");
+          showProgressBar(false);
+          showTaskBadge(false);
+          const err = (d.result && d.result.error) ? d.result.error : "unknown error";
+          appendMsg("result", "Task failed: " + err, true);
+          resetInput();
+          pollRunning = false;
+          return;
+        }
+        // else: still running, continue polling
+      } catch (e) {
+        // If aborted, stop silently
+        if (signal && signal.aborted) {
+          pollRunning = false;
+          return;
+        }
+
+        consecutiveFailures++;
+        console.warn("Poll error (attempt " + consecutiveFailures + "/" + MAX_CONSECUTIVE_FAILURES + "):", e.message || e);
+
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+          await hideThinkingIndicator();
+          appendMsg("result", "Polling stopped after " + MAX_CONSECUTIVE_FAILURES + " consecutive network errors: " + (e.message || e), true);
+          resetTaskUI();
+          resetInput();
+          pollRunning = false;
+          return;
+        }
+        // Transient error: continue polling
+      }
     }
-  }, 3000);
+
+    // Reached max poll count
+    await hideThinkingIndicator();
+    appendMsg("result", "This is taking longer than expected. The task is still running in the background.", false);
+    showProgressBar(false);
+    showTaskBadge(false);
+    setTaskStatus("IDLE", "");
+    resetInput();
+  } finally {
+    pollRunning = false;
+  }
 }
 
 function showThinkingIndicator(label) {
@@ -398,10 +530,22 @@ function resetTaskUI() {
   document.getElementById("task-id-display").textContent = "";
 }
 
-// ── Cohorts sidebar ───────────────────────────────────────
+// ── Cohorts sidebar (event delegation) ────────────────────
 async function loadCohorts() {
   const list = document.getElementById("cohorts-list");
   const count = document.getElementById("cohort-count");
+
+  // Remove old delegated handler if any, then add fresh one
+  if (!list._cohortDelegateAttached) {
+    list.addEventListener("click", (e) => {
+      const item = e.target.closest(".cohort-item");
+      if (item && item.dataset.name) {
+        openArchives(item.dataset.name);
+      }
+    });
+    list._cohortDelegateAttached = true;
+  }
+
   try {
     const cohorts = await API.listCohorts();
     count.textContent = cohorts.length;
@@ -415,9 +559,7 @@ async function loadCohorts() {
         '<span class="c-count">' + (c.entry_count || 0) + '</span>' +
       '</div>'
     ).join("");
-    list.querySelectorAll(".cohort-item").forEach(item => {
-      item.addEventListener("click", () => openArchives(item.dataset.name));
-    });
+    // No per-item listeners needed — delegation handles clicks
   } catch (e) {
     list.innerHTML = '<div class="cohorts-empty" style="color:var(--red)">LOAD FAILED</div>';
   }
@@ -475,6 +617,18 @@ async function openArchives(selectedCohort) {
   const entriesEl = document.getElementById("archives-entries");
   cohortsEl.innerHTML = '<div style="color:var(--muted);font-size:12px">Loading…</div>';
   entriesEl.innerHTML = '<div class="entries-placeholder">SELECT A COHORT TO VIEW ENTRIES</div>';
+
+  // Use event delegation for archive cohort items
+  if (!cohortsEl._archiveDelegateAttached) {
+    cohortsEl.addEventListener("click", (e) => {
+      const item = e.target.closest(".cohort-item");
+      if (item && item.dataset.name) {
+        loadEntries(item.dataset.name, document.getElementById("archives-entries"));
+      }
+    });
+    cohortsEl._archiveDelegateAttached = true;
+  }
+
   try {
     const cohorts = await API.listCohorts();
     if (!cohorts.length) {
@@ -488,9 +642,7 @@ async function openArchives(selectedCohort) {
         '<span class="c-count">' + (c.entry_count || 0) + '</span>' +
       '</div>'
     ).join("");
-    cohortsEl.querySelectorAll(".cohort-item").forEach(item => {
-      item.addEventListener("click", () => loadEntries(item.dataset.name, entriesEl));
-    });
+    // No per-item listeners needed — delegation handles clicks
     if (selectedCohort) loadEntries(selectedCohort, entriesEl);
   } catch (e) {
     cohortsEl.innerHTML = '<div class="cohorts-empty" style="color:var(--red)">LOAD FAILED</div>';
@@ -560,6 +712,9 @@ async function checkBackend() {
 // ── Sign out ──────────────────────────────────────────────
 function initSignOut() {
   document.getElementById("signout-btn").addEventListener("click", () => {
+    // Clean up intervals and abort in-flight requests
+    stopClock();
+    abortActiveRequest();
     if (window.clearAllDoingLoginCache) window.clearAllDoingLoginCache();
   });
 }

@@ -165,13 +165,23 @@ _QUEUE_SINGLETON: QueueBackend | None = None
 
 
 def get_queue() -> QueueBackend:
-    """Return queue backend: Redis if REDIS_URL set, else in-memory."""
+    """Return queue backend: Redis if REDIS_URL set and reachable, else in-memory."""
     global _QUEUE_SINGLETON
     if _QUEUE_SINGLETON is not None:
         return _QUEUE_SINGLETON
     url = getattr(settings, "redis_url", None) or ""
     if url and url.strip():
-        _QUEUE_SINGLETON = RedisQueueBackend(url.strip())
+        backend = RedisQueueBackend(url.strip())
+        try:
+            client = backend._client_sync()
+            client.ping()
+            _QUEUE_SINGLETON = backend
+        except Exception:
+            logger.warning(
+                "Redis at %s unavailable, falling back to in-memory queue",
+                url.strip(),
+            )
+            _QUEUE_SINGLETON = InMemoryQueueBackend()
     else:
         _QUEUE_SINGLETON = InMemoryQueueBackend()
     return _QUEUE_SINGLETON

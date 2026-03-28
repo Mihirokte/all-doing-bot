@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
 from contextlib import asynccontextmanager
 
@@ -115,9 +116,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_origins = settings.cors_origins_list
+if not _cors_origins:
+    _cors_origins = ["http://localhost:3000", "http://localhost:8000", "http://127.0.0.1:8000"]
+    logger.warning("CORS_ALLOW_ORIGINS not set, using localhost defaults")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list or ["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -267,6 +272,8 @@ async def chat(q: str = "") -> dict[str, str]:
     """
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+    if len(q) > 10000:
+        raise HTTPException(status_code=400, detail="Query too long (max 10000 characters)")
     from apps.backend.actions.registry import run_action
     from apps.backend.llm.engine import get_llm
 
@@ -362,11 +369,14 @@ async def submit_query(q: str = "", session_key: str = "default") -> QueryAccept
     """
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
+    if len(q) > 10000:
+        raise HTTPException(status_code=400, detail="Query too long (max 10000 characters)")
     lane_key = (session_key or "default").strip() or "default"
     task_id = task_store.create(q.strip(), session_key=lane_key)
     log_run_event("run_accepted", run_id=task_id, stage="api", session_key=lane_key)
     asyncio.create_task(enqueue_pipeline(task_id, q.strip(), lane_key))
-    task_store.cleanup_old()
+    if len(task_store._tasks) > 100:
+        task_store.cleanup_old()
     return QueryAcceptResponse(task_id=task_id, status="accepted", session_key=lane_key)
 
 
@@ -471,9 +481,14 @@ async def workflow_list_notes(session_key: str = "default", limit: int = 50) -> 
     return await _workflow_list_notes(session_key, limit)
 
 
+_COHORT_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]{1,100}$")
+
+
 @app.get("/cohort/{name}", response_model=list[CohortEntry])
 async def get_cohort_entries(name: str) -> list[CohortEntry]:
     """Return entries for a cohort."""
+    if not _COHORT_NAME_RE.match(name):
+        raise HTTPException(status_code=400, detail="Invalid cohort name")
     from apps.backend.db.catalogue import catalogue
     from apps.backend.db.sheets import list_cohort_entries as db_list_entries
     if await catalogue.get_cohort(name) is None:

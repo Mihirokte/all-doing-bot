@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>All-Doing Assistant</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -12,29 +11,21 @@
 
   <!-- LOGIN SCREEN -->
   <div id="login-overlay">
-    <div class="login-bg-grid"></div>
-    <div class="login-scanlines"></div>
     <div class="login-panel">
       <div class="login-header">
-        <div class="login-tag">SYS://AUTH-GATE v2.6</div>
-        <h1>ALL-DOING<br><span class="login-sub">INTELLIGENCE TERMINAL</span></h1>
+        <h1>Welcome back</h1>
         <div class="login-status-row">
           <span class="blink-dot"></span>
-          <span class="login-status-text">AWAITING OPERATOR CREDENTIALS</span>
+          <span class="login-status-text">Sign in to continue</span>
         </div>
       </div>
       <div class="login-divider"></div>
       <div id="g_id_onload" class="google-btn-wrapper"></div>
-      <button id="dev-bypass-btn" class="dev-btn">[ DEV OVERRIDE ]</button>
-      <div class="login-footer">
-        <span>CLEARANCE LEVEL: OMEGA</span>
-        <span>ENCRYPTION: AES-512</span>
-        <span>NODE: EC2-US-EAST-1</span>
-      </div>
+      <button id="dev-bypass-btn" class="dev-btn">Dev bypass</button>
     </div>
   </div>
 
-  <!-- MAIN TERMINAL (hidden until auth) -->
+  <!-- MAIN APP (hidden until auth) -->
   <div id="terminal-root" style="display:none">
 
     <!-- TOP BAR -->
@@ -42,75 +33,65 @@
 
     <header class="top-bar">
       <div class="top-bar-left">
-        <span class="top-logo">ALL-DOING</span>
-        <span class="top-divider">|</span>
-        <span class="top-tag">INTEL TERMINAL</span>
+        <span class="top-logo">all-doing</span>
       </div>
       <div class="top-bar-center">
-        <span class="sys-node">NODE: EC2-US-EAST-1</span>
-        <span class="sys-sep">·</span>
         <span id="sys-time" class="sys-time"></span>
-        <span class="sys-sep">·</span>
-        <span id="sys-status" class="sys-status online">ONLINE</span>
+        <span class="sys-sep">&middot;</span>
+        <span id="sys-status" class="sys-status online">Online</span>
       </div>
       <div class="top-bar-right">
-        <button class="icon-btn" id="profile-toggle" title="Profile">PROFILE</button>
-        <button class="icon-btn" id="archives-toggle" title="Data Archives">⬡ ARCHIVES</button>
-        <button class="icon-btn danger" id="signout-btn" title="Sign Out">⏻ EXIT</button>
+        <button class="icon-btn" id="profile-toggle" title="Profile" aria-label="Profile">Profile</button>
+        <button class="icon-btn" id="archives-toggle" title="Collections" aria-label="Collections">Collections</button>
+        <button class="icon-btn danger" id="signout-btn" title="Sign Out" aria-label="Sign out">Sign out</button>
       </div>
     </header>
 
     <!-- MAIN LAYOUT -->
-    <main class="main-layout">
+    <main class="main-layout" role="main">
 
       <!-- LEFT COLUMN: FEED + QUERY -->
       <section class="col-feed">
 
-        <!-- Query terminal -->
+        <!-- Query input -->
         <div class="query-box">
-          <div class="query-label">
-            <span class="prompt-arrow">▶</span> SYSTEM COMMAND
-            <span class="query-hint">[ENTER to execute]</span>
-          </div>
           <div class="query-input-row">
-            <span class="query-prefix">$&gt;</span>
-            <input type="text" id="main-query" placeholder="Ask anything, search, or request research…" autocomplete="off" spellcheck="false" />
-            <button id="exec-btn" class="exec-btn">EXEC</button>
+            <input type="text" id="main-query" placeholder="Ask anything, search, or request research..." autocomplete="off" spellcheck="false" aria-label="Query input" />
+            <button id="exec-btn" class="exec-btn" aria-label="Send">Send</button>
           </div>
           <div class="query-examples workflow-modes">
-            <span class="ex-label">QUICK WORKFLOW</span>
-            <button type="button" class="mode-chip active" data-mode="ask" title="Chat or long research pipeline">ASK YOUR AI</button>
-            <button type="button" class="mode-chip" data-mode="task" title="Save a task — no LLM">ADD TASK</button>
-            <button type="button" class="mode-chip" data-mode="note" title="Save a note — no LLM">NOTE IT</button>
+            <button type="button" class="mode-chip active" data-mode="ask" title="Chat or long research pipeline">Ask</button>
+            <button type="button" class="mode-chip" data-mode="task" title="Save a task">Task</button>
+            <button type="button" class="mode-chip" data-mode="note" title="Save a note">Note</button>
           </div>
         </div>
 
         <!-- Chat thread -->
         <div class="feed-box chat-feed">
           <div class="feed-header">
-            <span class="feed-title">CHAT</span>
-            <span id="task-badge" class="task-badge hidden">TASK RUNNING</span>
-            <button class="clear-btn" id="clear-log">CLR</button>
+            <span class="feed-title">Chat</span>
+            <span id="task-badge" class="task-badge hidden">Processing</span>
+            <button class="clear-btn" id="clear-log" aria-label="Clear chat">Clear</button>
           </div>
             <div id="feed-log" class="feed-log chat-log">
             <div class="msg msg-system" id="boot-msg">
               <span class="msg-ts" id="boot-ts"></span>
-              <span class="msg-body">Pick a quick workflow above. Ask AI uses chat/research; Add task &amp; Note it save to your panels (Sheets) with no AI.</span>
+              <span class="msg-body">Pick a workflow above. Ask uses chat and research; Task &amp; Note save to your panels with no AI.</span>
             </div>
           </div>
         </div>
 
       </section>
 
-      <!-- RIGHT COLUMN: STATUS + COHORTS -->
+      <!-- RIGHT COLUMN: STATUS + SIDEBAR -->
       <aside class="col-aside">
 
         <!-- Task status -->
         <div class="status-card">
-          <div class="card-label">CURRENT TASK</div>
-          <div id="task-status" class="task-status idle">IDLE</div>
+          <div class="card-label">Current Task</div>
+          <div id="task-status" class="task-status idle">Idle</div>
           <div id="task-query-display" class="task-query-display"></div>
-          <div id="deep-retrieval-status" class="deep-retrieval-status hidden">Deep retrieval in progress…</div>
+          <div id="deep-retrieval-status" class="deep-retrieval-status hidden">Searching and analyzing...</div>
           <div class="progress-bar-wrap hidden" id="progress-wrap">
             <div class="progress-bar" id="progress-bar"></div>
           </div>
@@ -119,45 +100,45 @@
 
         <!-- Tasks / notes (per session, Sheets-backed) -->
         <div class="workflow-card">
-          <div class="card-label">TASKS <button type="button" class="wf-refresh" id="refresh-workflows" title="Refresh">↻</button></div>
+          <div class="card-label">Tasks <button type="button" class="wf-refresh" id="refresh-workflows" title="Refresh" aria-label="Refresh tasks">&#8635;</button></div>
           <div id="tasks-list" class="workflow-list">
             <div class="workflow-empty">No tasks yet.</div>
           </div>
         </div>
         <div class="workflow-card">
-          <div class="card-label">NOTES</div>
+          <div class="card-label">Notes</div>
           <div id="notes-list" class="workflow-list">
             <div class="workflow-empty">No notes yet.</div>
           </div>
         </div>
 
-        <!-- Cohorts sidebar -->
+        <!-- Collections sidebar -->
         <div class="cohorts-card">
-          <div class="card-label">DATA ARCHIVES
+          <div class="card-label">Collections
             <span class="cohort-count" id="cohort-count">0</span>
           </div>
           <div id="cohorts-list" class="cohorts-list">
-            <div class="cohorts-empty">No archives yet.</div>
+            <div class="cohorts-empty">No collections yet.</div>
           </div>
         </div>
 
-        <!-- System metrics -->
+        <!-- System info -->
         <div class="metrics-card">
-          <div class="card-label">SYSTEM METRICS</div>
+          <div class="card-label">System</div>
           <div class="metric-row">
-            <span class="metric-name">LLM ENGINE</span>
+            <span class="metric-name">Model</span>
             <span class="metric-val" id="metric-llm">qwen3.5:9b</span>
           </div>
           <div class="metric-row">
-            <span class="metric-name">WEB SEARCH</span>
+            <span class="metric-name">Web search</span>
             <span class="metric-val" id="metric-websearch">OFF</span>
           </div>
           <div class="metric-row">
-            <span class="metric-name">BACKEND</span>
-            <span class="metric-val" id="metric-backend">checking…</span>
+            <span class="metric-name">Backend</span>
+            <span class="metric-val" id="metric-backend">checking...</span>
           </div>
           <div class="metric-row">
-            <span class="metric-name">QUERIES RUN</span>
+            <span class="metric-name">Queries</span>
             <span class="metric-val" id="metric-queries">0</span>
           </div>
         </div>
@@ -166,34 +147,34 @@
     </main>
 
     <!-- PROFILE OVERLAY -->
-    <div id="profile-overlay" class="profile-overlay hidden">
+    <div id="profile-overlay" class="profile-overlay hidden" role="dialog" aria-label="Profile and data">
       <div class="profile-panel">
         <div class="profile-header">
-          <span class="profile-title">Profile & Data</span>
-          <button class="profile-close" id="close-profile">Close</button>
+          <span class="profile-title">Profile &amp; Data</span>
+          <button class="profile-close" id="close-profile" aria-label="Close profile">Close</button>
         </div>
         <div class="profile-body">
           <p class="profile-copy">
             Clear past sessions and all cohort data stored in Google Sheets (or local fake storage).
             This action cannot be undone.
           </p>
-          <button id="clear-all-data-btn" class="danger-action-btn">Clear Past Sessions + Drive Data</button>
+          <button id="clear-all-data-btn" class="danger-action-btn">Clear all data</button>
           <div id="profile-status" class="profile-status"></div>
         </div>
       </div>
     </div>
 
     <!-- ARCHIVES OVERLAY -->
-    <div id="archives-overlay" class="archives-overlay hidden">
+    <div id="archives-overlay" class="archives-overlay hidden" role="dialog" aria-label="Collections browser">
       <div class="archives-panel">
         <div class="archives-header">
-          <span class="archives-title">DATA ARCHIVES // COHORT BROWSER</span>
-          <button class="archives-close" id="close-archives">✕ CLOSE</button>
+          <span class="archives-title">Collections</span>
+          <button class="archives-close" id="close-archives" aria-label="Close collections">Close</button>
         </div>
         <div class="archives-body">
           <div id="archives-cohorts" class="archives-cohorts"></div>
           <div id="archives-entries" class="archives-entries">
-            <div class="entries-placeholder">SELECT A COHORT TO VIEW ENTRIES</div>
+            <div class="entries-placeholder">Select a collection to view entries</div>
           </div>
         </div>
       </div>

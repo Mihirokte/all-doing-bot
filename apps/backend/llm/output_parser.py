@@ -184,15 +184,35 @@ def _default_for_annotation(annotation: Any) -> Any:
     return None
 
 
-def _coerce_for_schema(data: dict[str, Any], schema: type[BaseModel]) -> dict[str, Any]:
+def _coerce_for_schema(
+    data: dict[str, Any],
+    schema: type[BaseModel],
+    strict_fields: set[str] | None = None,
+) -> dict[str, Any]:
     corrected = dict(data)
+    strict = strict_fields or set()
     for field_name, field_info in schema.model_fields.items():
         annotation = field_info.annotation
         if field_name not in corrected or corrected[field_name] is None:
+            if field_name in strict:
+                raise ValueError(
+                    f"Required field '{field_name}' is missing from LLM output for {schema.__name__}"
+                )
             default_value = _default_for_annotation(annotation)
             if default_value is not None:
+                logger.warning(
+                    "Coercing missing field '%s' to default %r for schema %s",
+                    field_name, default_value, schema.__name__,
+                )
                 corrected[field_name] = default_value
             continue
+        # For strict list fields, reject empty lists
+        if field_name in strict:
+            origin = get_origin(annotation)
+            if (annotation is list or origin is list) and isinstance(corrected[field_name], list) and not corrected[field_name]:
+                raise ValueError(
+                    f"Required field '{field_name}' must not be empty for {schema.__name__}"
+                )
         origin = get_origin(annotation)
         target = annotation
         if origin is None:
@@ -201,10 +221,22 @@ def _coerce_for_schema(data: dict[str, Any], schema: type[BaseModel]) -> dict[st
                 target = args[0]
                 origin = get_origin(target)
         if target is str and not isinstance(corrected[field_name], str):
+            logger.warning(
+                "Coercing field '%s' from %s to str for schema %s",
+                field_name, type(corrected[field_name]).__name__, schema.__name__,
+            )
             corrected[field_name] = str(corrected[field_name])
         elif (target is dict or origin is dict) and not isinstance(corrected[field_name], dict):
+            logger.warning(
+                "Coercing field '%s' from %s to empty dict for schema %s",
+                field_name, type(corrected[field_name]).__name__, schema.__name__,
+            )
             corrected[field_name] = {}
         elif (target is list or origin is list) and not isinstance(corrected[field_name], list):
+            logger.warning(
+                "Coercing field '%s' from %s to empty list for schema %s",
+                field_name, type(corrected[field_name]).__name__, schema.__name__,
+            )
             corrected[field_name] = []
     return corrected
 

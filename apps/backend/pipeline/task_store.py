@@ -1,6 +1,7 @@
 """In-memory task state. Single user, ephemeral across restarts."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -20,6 +21,7 @@ class TaskStore:
 
     def __init__(self) -> None:
         self._tasks: dict[str, dict[str, Any]] = {}
+        self._lock = asyncio.Lock()
 
     def create(self, query: str, session_key: str = "default") -> str:
         """Create a new task, return task_id."""
@@ -91,23 +93,67 @@ class TaskStore:
             result=TaskResult(error=error, message=error),
         )
 
+    def set_expired(self, task_id: str) -> None:
+        """Mark task as expired instead of deleting, so the frontend gets a meaningful status."""
+        self.set_status(
+            task_id,
+            "expired",
+            result=TaskResult(error="Task expired", message="Task expired after retention period"),
+        )
+
     def cleanup_old(self) -> None:
-        """Remove completed/failed tasks older than TASK_RETENTION_SECONDS."""
+        """Mark old completed/failed/expired tasks as expired. Never removes processing or accepted tasks."""
         now = time.time()
-        to_drop = []
+        to_expire: list[str] = []
         for tid, t in list(self._tasks.items()):  # snapshot to avoid mutation-during-iteration
+            if t["status"] in ("processing", "accepted"):
+                continue
+            if t["status"] == "expired":
+                # Already expired; remove if well past retention
+                try:
+                    updated_ts = datetime.fromisoformat(t["updated_at"].replace("Z", "+00:00")).timestamp()
+                    if (now - updated_ts) > TASK_RETENTION_SECONDS * 2:
+                        to_expire.append(tid)
+                except (ValueError, KeyError):
+                    pass
+                continue
             if t["status"] not in ("completed", "failed"):
                 continue
             try:
                 updated_ts = datetime.fromisoformat(t["updated_at"].replace("Z", "+00:00")).timestamp()
                 if (now - updated_ts) > TASK_RETENTION_SECONDS:
-                    to_drop.append(tid)
+                    to_expire.append(tid)
             except (ValueError, KeyError):
                 pass
-        for tid in to_drop:
-            del self._tasks[tid]
-        if to_drop:
-            logger.debug("Cleaned up %d old tasks", len(to_drop))
+        for tid in to_expire:
+            t = self._tasks.get(tid)
+            if t and t["status"] == "expired":
+                # Already expired and past 2x retention, safe to delete
+                del self._tasks[tid]
+            elif t:
+                self.set_expired(tid)
+        if to_expire:
+            logger.debug("Cleaned up %d old tasks", len(to_expire))
+
+    async def acreate(self, query: str, session_key: str = "default") -> str:
+        """Async-safe create: acquires lock before mutating _tasks."""
+        async with self._lock:
+            return self.create(query, session_key)
+
+    async def aset_status(self, task_id: str, status: str, result: TaskResult | dict | None = None) -> None:
+        """Async-safe set_status."""
+        async with self._lock:
+            self.set_status(task_id, status, result)
+
+    async def aget(self, task_id: str) -> dict[str, Any] | None:
+        """Async-safe get."""
+        async with self._lock:
+            return self.get(task_id)
+
+    async def acleanup_old(self) -> None:
+        """Async-safe cleanup_old."""
+        async with self._lock:
+            self.cleanup_old()
 
     def clear_all(self) -> int:
         """Clear all in-memory task sessions. Returns number removed."""
