@@ -98,8 +98,8 @@ Regressive checks (no test files): start backend, then `curl http://localhost:80
 1. **Push `main`** — Triggers **Deploy GitHub Pages (frontend)** (`.github/workflows/deploy-pages.yml`). The UI is served from `https://<user>.github.io/<repo>/` (configure Pages: branch `gh-pages`, root `/`).
 2. **`apps/frontend/index.html`** — Set `window.BACKEND_URL` to your public API (e.g. `https://54-165-94-30.sslip.io`), then push again so Pages picks it up.
 3. **Backend on EC2** — Use either:
-   - **GitHub Actions** (`.github/workflows/deploy-ec2.yml`): add secrets **`EC2_HOST`**, **`EC2_USER`** (e.g. `ubuntu`), **`EC2_SSH_KEY`** (private key PEM). Optionally set repo variable **`EC2_AUTO_DEPLOY`** = `true` to run deploy on every push to `main`; otherwise use **Actions → Deploy backend (EC2) → Run workflow** after each push.
-   - **SSH on the box**: `bash /home/ubuntu/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh`
+   - **GitHub Actions** (`.github/workflows/deploy-ec2.yml`): add Actions secrets **`EC2_HOST`**, **`EC2_USER`** (`ec2-user` on Amazon Linux, `ubuntu` on Ubuntu), **`EC2_SSH_KEY`** (full private key PEM). Step-by-step: [docs/deployment/github-actions-ec2-autodeploy.txt](docs/deployment/github-actions-ec2-autodeploy.txt). Optional repo variable **`EC2_AUTO_DEPLOY`** = `true` to deploy on every push to `main`; otherwise **Actions → Deploy backend (EC2) → Run workflow**.
+   - **SSH from your PC**: `Invoke-Ec2BackendUpdate.ps1` (see [apps/backend/deploy/ec2-runbook.md](apps/backend/deploy/ec2-runbook.md)) or on the server: `bash ~/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh`
 4. **EC2 `.env`** — Python **3.10+** venv, `pip install -r apps/backend/requirements.txt`, **`MCP_SEARCH_COMMAND_JSON`** set, **`CORS_ALLOW_ORIGINS`** includes your GitHub Pages origin (see table below).
 
 ## EC2: one-command update (fix “Not Found” on tasks/notes)
@@ -107,7 +107,8 @@ Regressive checks (no test files): start backend, then `curl http://localhost:80
 If the UI shows **Load failed** or **`Not Found`** on notes/tasks, the instance is usually on **old code**. SSH in and run:
 
 ```bash
-bash /home/ubuntu/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh
+# Amazon Linux: /home/ec2-user/all-doing-bot — Ubuntu: /home/ubuntu/all-doing-bot
+bash ~/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh
 ```
 
 (or `git pull`, `pip install -r apps/backend/requirements.txt`, `sudo systemctl restart alldoing` manually). After deploy, `GET /health` includes `"api":{"workflows":true,...}`.
