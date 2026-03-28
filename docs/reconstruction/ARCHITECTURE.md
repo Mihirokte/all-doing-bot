@@ -1,6 +1,6 @@
 # Phase 1 — Target Architecture (`all-doing-bot`)
 
-**Status:** Blueprint (not yet fully implemented). Migrate in vertical slices; keep tests green after each slice.
+**Status:** Partially implemented (2026-03-29): routers under `api/`, `services/chat_service.py`, `main.create_app()`. Further service extractions optional.
 
 ---
 
@@ -133,9 +133,9 @@ apps/frontend/
 
 ## Migration order (safe slices)
 
-1. Extract `services/chat_service.py` from `main.py` + wire `routes_chat.py` (tests: TestClient + mocks).
-2. Extract cohort list/detail routes to `routes_pipeline.py`.
-3. Split CSS into `tokens.css` + imports (no visual change).
+1. ~~Extract `services/chat_service.py` from `main.py` + wire `routes_chat.py` (tests: TestClient + mocks).~~ **Done**
+2. ~~Cohort list/detail + query/status live in `routes_pipeline.py`.~~ **Done**
+3. ~~Split CSS into `tokens.css` + imports (no visual change).~~ **Done**
 4. Consider `parse_plan` linear graph vs plain functions (measure LOC saved).
 
 ---

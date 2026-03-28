@@ -5,8 +5,8 @@
 | RECON.md | Done → `RECON.md` |
 | ARCHITECTURE.md | Done → `ARCHITECTURE.md` |
 | DESIGN_SYSTEM.md | Done → `DESIGN_SYSTEM.md` |
-| Reconstructed source (full Phase 3) | **Deferred** — blueprint only; migrate slice-by-slice |
-| Tests for critical paths | **Existing** — 71 tests green; add per slice during Phase 3 |
+| Reconstructed source (Phase 3) | **In progress** — `api/*` routers, `services/chat_service.py`, token CSS split done |
+| Tests for critical paths | **71 green** after router extraction; extend per future slice |
 | Rewritten README (full) | **Partial** — pointer section added to root README |
 | CHANGES.md | Done → `CHANGES.md` |
 | CONTRIBUTING.md | Done → `CONTRIBUTING.md` |

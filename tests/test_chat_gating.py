@@ -7,20 +7,20 @@ from fastapi.testclient import TestClient
 
 
 def test_chat_looks_like_search_reviews() -> None:
-    from apps.backend.main import _chat_looks_like_search
+    from apps.backend.services.chat_service import chat_looks_like_search
 
-    assert _chat_looks_like_search("rotten tomatoes reviews dhurandhar 2")
-    assert _chat_looks_like_search("tell me the reviews")
-    assert not _chat_looks_like_search("hi")
+    assert chat_looks_like_search("rotten tomatoes reviews dhurandhar 2")
+    assert chat_looks_like_search("tell me the reviews")
+    assert not chat_looks_like_search("hi")
 
 
 def test_dedupe_entries_by_source() -> None:
-    from apps.backend.main import _dedupe_entries_by_source
+    from apps.backend.services.chat_service import dedupe_entries_by_source
 
     a = MagicMock(source="https://example.com/page", content="one")
     b = MagicMock(source="https://example.com/page#frag", content="two")
     c = MagicMock(source="https://other.test/", content="three")
-    out = _dedupe_entries_by_source([a, b, c], max_keep=10)
+    out = dedupe_entries_by_source([a, b, c], max_keep=10)
     assert len(out) == 2
 
 

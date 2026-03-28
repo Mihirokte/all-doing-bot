@@ -1,6 +1,6 @@
 # ADR-001: Split `main.py` by HTTP routers
 
-- **Status:** Accepted (target state)
+- **Status:** Accepted — **partially migrated** (`api/routes_*.py`, `services/chat_service.py`, `create_app()` in `main.py`)
 - **Date:** 2026-03-29
 
 ## Context
