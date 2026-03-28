@@ -2,6 +2,18 @@
 
 `all-doing-bot` is a personal, always-on LLM-powered automation bot that turns natural-language requests into structured pipelines. A query is parsed into a cohort and an action, executed through a staged backend pipeline, and stored in Google Sheets.
 
+## Reconstruction program (architecture & design)
+
+Ground-up redesign is **documented first**, then applied in vertical slices (see **`docs/reconstruction/CHANGES.md`** for status).
+
+| Doc | Purpose |
+|-----|---------|
+| [RECON.md](docs/reconstruction/RECON.md) | Phase 0 — full recon, data flow, pain points, naming debt |
+| [ARCHITECTURE.md](docs/reconstruction/ARCHITECTURE.md) | Phase 1 — target module layout and contracts |
+| [DESIGN_SYSTEM.md](docs/reconstruction/DESIGN_SYSTEM.md) | Phase 2 — frontend tokens, motion, a11y |
+| [CONTRIBUTING.md](docs/reconstruction/CONTRIBUTING.md) | Mental model for contributors |
+| [OUTPUT_CHECKLIST.md](docs/reconstruction/OUTPUT_CHECKLIST.md) | Contract checklist vs delivered |
+
 **Backend runtime:** Python **3.10+** (required for `langgraph` and `mcp`). Install deps with `pip install -r apps/backend/requirements.txt`.
 
 ## Architecture
