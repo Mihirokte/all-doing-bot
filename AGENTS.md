@@ -25,6 +25,11 @@ After **any** change under `apps/backend/` (or anything that affects the running
 
 Reference: [apps/backend/deploy/ec2-runbook.md](./apps/backend/deploy/ec2-runbook.md), [docs/deployment/aws-credentials-and-deploy.md](./docs/deployment/aws-credentials-and-deploy.md).
 
+### Stateless / scale (expectations)
+
+- **`REDIS_URL`**: When set and reachable, the **step queue** and **`task_store`** (hash `alldoing:tasks`) use Redis so multiple API processes can share step results and **`GET /status/{task_id}`**. The **gateway** (`GatewayScheduler`) and **`memory_store`** remain **in-process** unless further work is done—load balancers should still prefer **sticky sessions** for `/query` + in-flight runs, or run a **single** API worker until gateway is externalized.
+- **Browser**: `session_key` comes from the Google JWT `sub` (client-side); the API does **not** verify that JWT today—treat as identification label, not cryptographic auth. Frontend uses `localStorage` + **`storage` events** for cross-tab sign-out / session sync.
+
 ## Monorepo Layout
 
 ```text

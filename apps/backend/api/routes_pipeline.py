@@ -31,7 +31,7 @@ async def submit_query(q: str = "", session_key: str = "default") -> QueryAccept
     task_id = task_store.create(q.strip(), session_key=lane_key)
     log_run_event("run_accepted", run_id=task_id, stage="api", session_key=lane_key)
     asyncio.create_task(enqueue_pipeline(task_id, q.strip(), lane_key))
-    if len(task_store._tasks) > 100:
+    if task_store.task_count() > 100:
         task_store.cleanup_old()
     return QueryAcceptResponse(task_id=task_id, status="accepted", session_key=lane_key)
 

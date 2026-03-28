@@ -156,7 +156,8 @@ async function _getWorkflowList(primaryPath, altPath, limit, signal) {
 
 const API = {
   /**
-   * GET /health → { status, api: { version, chat, pipeline, workflows } }
+   * GET /health → { status, api: { version, chat, pipeline, workflows, task_store } }
+   * task_store is "redis" or "memory" (shared task state when redis).
    */
   async health(signal) {
     const res = await _fetchWithTimeout(_apiRoot() + "/health", undefined, _TIMEOUT_DEFAULT, signal);

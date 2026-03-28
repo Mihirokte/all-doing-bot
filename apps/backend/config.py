@@ -66,7 +66,7 @@ class Settings(BaseSettings):
     chat_deep_max_cycles: int = 3
     chat_deep_top_links: int = 4
 
-    # Queue (optional): when set, pipeline step execution uses Redis and workers.
+    # Redis (optional): step queue + shared task_store (GET /status across API replicas) when reachable; workers consume the step queue.
     redis_url: str = ""
     # Executor mode: queue-first by default, legacy in-process path is fallback only.
     orchestrator_legacy_fallback_enabled: bool = False

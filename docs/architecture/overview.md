@@ -48,6 +48,7 @@ testsDir --> backendApp
 - Adapter-based extractor and Google Sheets DB layer
 - Action registry with **contracts** (capability_id, error taxonomy, idempotency)
 - **Orchestration**: queue abstraction (in-memory or Redis), step events, run state (durable checkpoints when Redis is set)
+- **Task IDs**: default in-process `task_store`; with **`REDIS_URL`**, task status/result live in Redis (`alldoing:tasks`) so `/query` and `/status` can use different API instances. Gateway lanes and `memory_store` remain per-process unless further work is done.
 - **Workers**: `apps.backend.workers.run_worker` consumes step jobs from the queue, executes actions with retries, writes step results
 - **Telemetry**: structured run/step events and action_exec logs for correlation and metrics
 - **Web capability escalation**: planner can escalate `search_web -> web_fetch -> browser_automation` for dynamic/interactive pages

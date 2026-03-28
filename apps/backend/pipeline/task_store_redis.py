@@ -1,36 +1,42 @@
-"""In-memory task state. Single user, ephemeral across restarts."""
+"""Redis-backed task store for shared /status across API replicas (optional)."""
 from __future__ import annotations
 
-import asyncio
+import json
 import logging
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    from apps.backend.pipeline.task_store_redis import RedisTaskStore as _RedisTaskStore
-
+from apps.backend.config import settings
 from apps.backend.models.schemas import TaskResult, TaskStatusResponse
 
 logger = logging.getLogger(__name__)
 
-# Completed tasks older than this (seconds) are removed on cleanup
+TASK_HASH_KEY = "alldoing:tasks"
 TASK_RETENTION_SECONDS = 3600
 
 
-class TaskStore:
-    """In-memory store: task_id -> task state."""
+class RedisTaskStore:
+    """Hash alldoing:tasks field=task_id value=json — same contract as TaskStore."""
 
-    def __init__(self) -> None:
-        self._tasks: dict[str, dict[str, Any]] = {}
-        self._lock = asyncio.Lock()
+    def __init__(self, redis_url: str) -> None:
+        import redis as redis_mod
+
+        self._url = redis_url
+        self._r = redis_mod.from_url(redis_url, decode_responses=True)
+        self._r.ping()
+
+    def _client(self) -> Any:
+        return self._r
+
+    def task_count(self) -> int:
+        return int(self._client().hlen(TASK_HASH_KEY))
 
     def create(self, query: str, session_key: str = "default") -> str:
-        """Create a new task, return task_id."""
         task_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat()
-        self._tasks[task_id] = {
+        blob = {
             "task_id": task_id,
             "status": "accepted",
             "query": query,
@@ -39,15 +45,20 @@ class TaskStore:
             "created_at": now,
             "updated_at": now,
         }
+        self._client().hset(TASK_HASH_KEY, task_id, json.dumps(blob))
         return task_id
 
     def get(self, task_id: str) -> dict[str, Any] | None:
-        """Return raw task dict or None."""
-        return self._tasks.get(task_id)
+        raw = self._client().hget(TASK_HASH_KEY, task_id)
+        if not raw:
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            return None
 
     def get_response(self, task_id: str) -> TaskStatusResponse | None:
-        """Return task as TaskStatusResponse or None."""
-        t = self._tasks.get(task_id)
+        t = self.get(task_id)
         if not t:
             return None
         result = t.get("result")
@@ -75,21 +86,23 @@ class TaskStore:
             updated_at=updated_at,
         )
 
+    def _save(self, task_id: str, t: dict[str, Any]) -> None:
+        self._client().hset(TASK_HASH_KEY, task_id, json.dumps(t))
+
     def set_status(self, task_id: str, status: str, result: TaskResult | dict | None = None) -> None:
-        """Update status and optionally result."""
-        if task_id not in self._tasks:
+        t = self.get(task_id)
+        if not t:
             return
-        self._tasks[task_id]["status"] = status
-        self._tasks[task_id]["updated_at"] = datetime.now(timezone.utc).isoformat()
+        t["status"] = status
+        t["updated_at"] = datetime.now(timezone.utc).isoformat()
         if result is not None:
-            self._tasks[task_id]["result"] = result.model_dump() if isinstance(result, TaskResult) else result
+            t["result"] = result.model_dump() if isinstance(result, TaskResult) else result
+        self._save(task_id, t)
 
     def set_result(self, task_id: str, result: TaskResult | dict) -> None:
-        """Set result and mark completed."""
         self.set_status(task_id, "completed", result=result)
 
     def set_failed(self, task_id: str, error: str) -> None:
-        """Mark task as failed with error message."""
         self.set_status(
             task_id,
             "failed",
@@ -97,7 +110,6 @@ class TaskStore:
         )
 
     def set_expired(self, task_id: str) -> None:
-        """Mark task as expired instead of deleting, so the frontend gets a meaningful status."""
         self.set_status(
             task_id,
             "expired",
@@ -105,18 +117,23 @@ class TaskStore:
         )
 
     def cleanup_old(self) -> None:
-        """Mark old completed/failed/expired tasks as expired. Never removes processing or accepted tasks."""
+        """Match in-memory TaskStore.cleanup_old semantics."""
         now = time.time()
         to_expire: list[str] = []
-        for tid, t in list(self._tasks.items()):  # snapshot to avoid mutation-during-iteration
+        client = self._client()
+        for task_id, raw in list(client.hgetall(TASK_HASH_KEY).items()):
+            try:
+                t = json.loads(raw)
+            except json.JSONDecodeError:
+                client.hdel(TASK_HASH_KEY, task_id)
+                continue
             if t["status"] in ("processing", "accepted"):
                 continue
             if t["status"] == "expired":
-                # Already expired; remove if well past retention
                 try:
                     updated_ts = datetime.fromisoformat(t["updated_at"].replace("Z", "+00:00")).timestamp()
                     if (now - updated_ts) > TASK_RETENTION_SECONDS * 2:
-                        to_expire.append(tid)
+                        to_expire.append(task_id)
                 except (ValueError, KeyError):
                     pass
                 continue
@@ -125,62 +142,53 @@ class TaskStore:
             try:
                 updated_ts = datetime.fromisoformat(t["updated_at"].replace("Z", "+00:00")).timestamp()
                 if (now - updated_ts) > TASK_RETENTION_SECONDS:
-                    to_expire.append(tid)
+                    to_expire.append(task_id)
             except (ValueError, KeyError):
                 pass
         for tid in to_expire:
-            t = self._tasks.get(tid)
+            t = self.get(tid)
             if t and t["status"] == "expired":
-                # Already expired and past 2x retention, safe to delete
-                del self._tasks[tid]
+                client.hdel(TASK_HASH_KEY, tid)
             elif t:
                 self.set_expired(tid)
         if to_expire:
-            logger.debug("Cleaned up %d old tasks", len(to_expire))
+            logger.debug("Cleaned up %d old tasks (redis)", len(to_expire))
 
     async def acreate(self, query: str, session_key: str = "default") -> str:
-        """Async-safe create: acquires lock before mutating _tasks."""
-        async with self._lock:
-            return self.create(query, session_key)
+        return self.create(query, session_key)
 
     async def aset_status(self, task_id: str, status: str, result: TaskResult | dict | None = None) -> None:
-        """Async-safe set_status."""
-        async with self._lock:
-            self.set_status(task_id, status, result)
+        self.set_status(task_id, status, result)
 
     async def aget(self, task_id: str) -> dict[str, Any] | None:
-        """Async-safe get."""
-        async with self._lock:
-            return self.get(task_id)
+        return self.get(task_id)
 
     async def acleanup_old(self) -> None:
-        """Async-safe cleanup_old."""
-        async with self._lock:
-            self.cleanup_old()
+        self.cleanup_old()
 
     def clear_all(self) -> int:
-        """Clear all in-memory task sessions. Returns number removed."""
-        count = len(self._tasks)
-        self._tasks.clear()
-        return count
-
-    def task_count(self) -> int:
-        return len(self._tasks)
+        n = self.task_count()
+        self._client().delete(TASK_HASH_KEY)
+        return n
 
     @property
     def backend_label(self) -> str:
-        return "memory"
+        return "redis"
 
 
-def _select_task_store() -> TaskStore | _RedisTaskStore:
-    """Use Redis-backed task store when REDIS_URL is set and reachable (shared /status across replicas)."""
-    from apps.backend.pipeline.task_store_redis import try_redis_task_store
-
-    redis_store = try_redis_task_store()
-    if redis_store is not None:
-        return redis_store
-    logger.info("Task store: in-memory (set REDIS_URL for shared task state across API processes)")
-    return TaskStore()
-
-
-task_store = _select_task_store()
+def try_redis_task_store() -> RedisTaskStore | None:
+    try:
+        import redis  # noqa: F401 — package required for RedisTaskStore; optional install for tests/CI without deps
+    except ImportError:
+        logger.debug("redis package not installed; task store stays in-memory")
+        return None
+    url = (getattr(settings, "redis_url", None) or "").strip()
+    if not url:
+        return None
+    try:
+        store = RedisTaskStore(url)
+        logger.info("Task store: Redis (%s)", TASK_HASH_KEY)
+        return store
+    except Exception as e:
+        logger.warning("Redis task store unavailable, using in-memory: %s", e)
+        return None

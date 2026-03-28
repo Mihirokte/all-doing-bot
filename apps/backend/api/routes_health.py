@@ -5,6 +5,8 @@ from typing import Any
 
 from fastapi import APIRouter
 
+from apps.backend.pipeline.task_store import task_store
+
 router = APIRouter(tags=["health"])
 
 
@@ -22,5 +24,6 @@ def health() -> dict[str, Any]:
             "chat": True,
             "pipeline": True,
             "workflows": True,
+            "task_store": getattr(task_store, "backend_label", "memory"),
         },
     }

@@ -43,6 +43,19 @@ window.getSessionKey = function () {
   return readStoredSessionKey();
 };
 
+/** Sync session across tabs; reload when another tab signs out. */
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", function (ev) {
+    if (ev.key === LOGIN_CACHE_KEY && ev.newValue === null) {
+      window.location.reload();
+      return;
+    }
+    if (ev.key === SESSION_KEY_STORAGE && typeof ev.newValue === "string" && ev.newValue.length) {
+      window.SESSION_KEY = ev.newValue;
+    }
+  });
+}
+
 function isLocalHost() {
   return typeof window !== "undefined" &&
     (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
@@ -97,6 +110,7 @@ function initGoogleAuth() {
         isAuthenticated = true;
         window.SESSION_KEY = "local-dev";
         persistSessionKey("local-dev");
+        persistLogin();
         unlockSystem();
       });
     }
@@ -104,10 +118,15 @@ function initGoogleAuth() {
 
   const fromCache = hasValidCachedLogin();
   if (fromCache) {
-    isAuthenticated = true;
-    window.SESSION_KEY = readStoredSessionKey();
-    unlockSystem();
-    return;
+    const sk = readStoredSessionKey();
+    if (!sk || sk === "default") {
+      clearLoginCache();
+    } else {
+      isAuthenticated = true;
+      window.SESSION_KEY = sk;
+      unlockSystem();
+      return;
+    }
   }
 
   if (window.google && window.google.accounts) {

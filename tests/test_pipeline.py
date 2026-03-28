@@ -22,6 +22,7 @@ def test_health() -> None:
     assert api.get("workflows") is True
     assert api.get("chat") is True
     assert api.get("pipeline") is True
+    assert api.get("task_store") in ("memory", "redis")
     assert isinstance(api.get("version"), str) and len(api.get("version", "")) > 0
 
 

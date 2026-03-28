@@ -152,7 +152,7 @@ For real LLM output and real persistence, configure the backend via a `.env` fil
 | `MCP_SEARCH_COMMAND_JSON` | **Yes** when provider is `mcp` | JSON array of command argv to start the MCP server (stdio). |
 | `MCP_SEARCH_TOOL_NAME` | No | Tool name to call (default `search`). |
 | `MCP_SEARCH_QUERY_PARAM` | No | Argument key for the query (default `query`). |
-| `REDIS_URL` | For queue | When set, pipeline enqueues steps to Redis; run a worker to process them (`python -m apps.backend.workers.run_worker`). Enables durable run state. |
+| `REDIS_URL` | For queue + optional shared tasks | When set and reachable: pipeline step queue + **`task_store` in Redis** so any API replica can serve `GET /status/{task_id}`; run `python -m apps.backend.workers.run_worker` for steps. `GET /health` reports `api.task_store`: `redis` or `memory`. |
 | `ORCHESTRATOR_LEGACY_FALLBACK_ENABLED` | No | Default `false`. If `true`, fall back to legacy in-process execution only when queue path fails. |
 | `CORS_ALLOW_ORIGINS` | No | Comma-separated origins for CORS (e.g. `http://localhost:3000`). |
 | `HOST` | No | Bind host (default: `0.0.0.0`). |
