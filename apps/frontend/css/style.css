@@ -1093,6 +1093,8 @@ body.intel-open {
 .profile-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 
 .profile-copy { color: var(--text-secondary); line-height: 1.6; font-size: 14px; }
+.profile-workspace-line { font-size: 12px; margin-bottom: 14px; }
+.profile-workspace-line code { font-size: 11px; word-break: break-all; }
 
 .danger-action-btn {
   align-self: flex-start;

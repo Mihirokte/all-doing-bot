@@ -638,6 +638,10 @@ function initProfile() {
   openBtn.addEventListener("click", () => {
     closeIntelDeck();
     statusEl.textContent = "";
+    const skEl = document.getElementById("profile-session-key");
+    if (skEl && typeof window.getSessionKey === "function") {
+      skEl.textContent = window.getSessionKey();
+    }
     overlay.classList.remove("hidden");
   });
   closeBtn.addEventListener("click", () => overlay.classList.add("hidden"));
