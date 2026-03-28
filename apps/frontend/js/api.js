@@ -155,6 +155,9 @@ async function _getWorkflowList(primaryPath, altPath, limit, signal) {
 }
 
 const API = {
+  /**
+   * GET /health → { status, api: { version, chat, pipeline, workflows } }
+   */
   async health(signal) {
     const res = await _fetchWithTimeout(_apiRoot() + "/health", undefined, _TIMEOUT_DEFAULT, signal);
     if (!res.ok) throw _apiError(await _errMessage(res), res.status, false);

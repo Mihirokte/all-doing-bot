@@ -18,7 +18,11 @@ def test_health() -> None:
     assert r.status_code == 200
     data = r.json()
     assert data.get("status") == "ok"
-    assert data.get("api", {}).get("workflows") is True
+    api = data.get("api", {})
+    assert api.get("workflows") is True
+    assert api.get("chat") is True
+    assert api.get("pipeline") is True
+    assert isinstance(api.get("version"), str) and len(api.get("version", "")) > 0
 
 
 def test_query_requires_q() -> None:

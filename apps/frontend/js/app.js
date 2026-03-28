@@ -727,6 +727,7 @@ async function loadEntries(name, container) {
 // ── Backend health check ──────────────────────────────────
 async function checkBackend() {
   const el = document.getElementById("metric-backend");
+  const verEl = document.getElementById("metric-api-version");
   const banner = document.getElementById("backend-banner");
   const showBanner = function (text) {
     if (!banner) return;
@@ -736,18 +737,31 @@ async function checkBackend() {
   const hideBanner = function () {
     if (banner) banner.classList.add("hidden");
   };
+  const setApiVersion = function (text, title) {
+    if (!verEl) return;
+    verEl.textContent = text || "—";
+    verEl.title = title || "Reported by GET /health";
+  };
+
   try {
     const data = await API.health();
-    const wf = data && data.api && data.api.workflows === true;
+    const api = data && data.api;
+    const wf = api && api.workflows === true;
     if (wf) {
       el.textContent = "CONNECTED";
       el.classList.add("online");
       el.style.color = "";
       hideBanner();
+      if (api.version) {
+        setApiVersion(String(api.version), "GET /health → api.version");
+      } else {
+        setApiVersion("legacy", "Backend did not report api.version");
+      }
     } else {
       el.textContent = "NEEDS UPDATE";
       el.classList.remove("online");
       el.style.color = "var(--amber)";
+      setApiVersion("—", "Workflow API missing on server");
       showBanner(
         "Backend is up but running an old build (no task/note workflow API). On EC2: " +
           "cd ~/all-doing-bot && git pull origin main && source venv/bin/activate && " +
@@ -758,6 +772,7 @@ async function checkBackend() {
     el.textContent = "OFFLINE";
     el.classList.remove("online");
     el.style.color = "var(--red)";
+    setApiVersion("—", "Backend unreachable");
     document.getElementById("sys-status").textContent = "DEGRADED";
     document.getElementById("sys-status").style.color = "var(--amber)";
     showBanner("Backend unreachable. Check EC2, security group, and BACKEND_URL in index.html. " + (e.message || e));

@@ -8,13 +8,19 @@ from fastapi import APIRouter
 router = APIRouter(tags=["health"])
 
 
+# Bump when HTTP surface or capability contract changes (frontend may read `api.version`).
+_API_VERSION = "2026.03-api-routers"
+
+
 @router.get("/health")
 def health() -> dict[str, Any]:
-    """Health check for monitoring and cron. `api.workflows` signals task/note workflow routes exist."""
+    """Health check for monitoring and cron. `api.*` flags tell the UI which route groups exist."""
     return {
         "status": "ok",
         "api": {
+            "version": _API_VERSION,
+            "chat": True,
+            "pipeline": True,
             "workflows": True,
-            "version": "2026.03-chat-transcript",
         },
     }
