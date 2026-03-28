@@ -2,6 +2,18 @@
 AUTO BACKEND UPDATE — GitHub Actions → EC2 (all-doing-bot)
 ================================================================================
 
+FASTEST (CLI — recommended if `gh` is installed and logged in)
+  From repo root on your PC:
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sync-github-actions-ec2.ps1
+  Or manually:
+    gh secret set EC2_HOST --body "your-instance-dns-or-ip"
+    gh secret set EC2_USER --body "ec2-user"
+    Get-Content -Raw "$env:USERPROFILE\.ssh\your_key" | gh secret set EC2_SSH_KEY
+    gh variable set EC2_AUTO_DEPLOY --body "true"
+  Requires: `gh auth login` with repo + workflow scopes.
+
+--------------------------------------------------------------------------------
+
 WHAT IT DOES
   Workflow: .github/workflows/deploy-ec2.yml
   On every push to main (if enabled) OR when you click "Run workflow":
