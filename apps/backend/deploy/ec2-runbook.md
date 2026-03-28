@@ -22,6 +22,48 @@ This instance has **no key pair** in the launch config. Use **EC2 Instance Conne
 - **Option A:** AWS Console → EC2 → Instances → select instance → **Connect** → **EC2 Instance Connect** → **Connect** (browser shell).
 - **Option B:** SSH with your key: `ssh -i your-key.pem ubuntu@ec2-54-165-94-30.compute-1.amazonaws.com` (user may be `ubuntu` or `ec2-user` depending on AMI).
 
+### Permanent SSH from Windows (this PC)
+
+1. **Key pair** (once per machine):  
+   `ssh-keygen -t ed25519 -f %USERPROFILE%\.ssh\alldoing_ec2 -C "all-doing-ec2"`  
+   (Repo deploy scripts expect **`%USERPROFILE%\.ssh\alldoing_ec2`**.)
+
+2. **Install your public key on the instance** (while logged in via **EC2 Instance Connect** browser shell as `ubuntu`):
+
+   ```bash
+   mkdir -p ~/.ssh
+   chmod 700 ~/.ssh
+   echo 'PASTE_CONTENT_OF_alldoing_ec2.pub_ONE_LINE_HERE' >> ~/.ssh/authorized_keys
+   chmod 600 ~/.ssh/authorized_keys
+   ```
+
+   Or open `nano ~/.ssh/authorized_keys` and paste the single line from `alldoing_ec2.pub`.
+
+3. **SSH config on Windows** — create or edit **`%USERPROFILE%\.ssh\config`**:
+
+   ```text
+   Host all-doing-ec2
+       HostName ec2-54-165-94-30.compute-1.amazonaws.com
+       User ubuntu
+       IdentityFile ~/.ssh/alldoing_ec2
+       IdentitiesOnly yes
+       StrictHostKeyChecking accept-new
+   ```
+
+   Amazon Linux images often use **`User ec2-user`** instead of `ubuntu`.
+
+4. **Connect:** `ssh all-doing-ec2`
+
+5. **Deploy script env** (PowerShell):  
+   `$env:SSH_KEY = "$env:USERPROFILE\.ssh\alldoing_ec2"`  
+   `$env:EC2_HOST = 'ec2-54-165-94-30.compute-1.amazonaws.com'`  
+   then `Invoke-Ec2BackendUpdate.ps1`.
+
+If `ssh` says the key is ignored, fix ACL on the private key (PowerShell as your user):
+
+`icacls %USERPROFILE%\.ssh\alldoing_ec2 /inheritance:r`  
+`icacls %USERPROFILE%\.ssh\alldoing_ec2 /grant:r "%USERNAME%:R"`
+
 ---
 
 ## 2. One-time setup (copy-paste into the shell)
