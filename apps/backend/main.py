@@ -136,7 +136,7 @@ def health() -> dict[str, Any]:
         "status": "ok",
         "api": {
             "workflows": True,
-            "version": "2026.03-workflows",
+            "version": "2026.03-chat-gate",
         },
     }
 
@@ -147,12 +147,71 @@ def _chat_looks_like_search(query: str) -> bool:
     if len(lower) < 4:
         return False
     triggers = (
-        "find", "search", "look up", "lookup", "get me", "fetch",
-        "latest", "recent", "today", "this week", "top", "best", "trending",
-        "what are the", "when did", "who is the", "where can i", "how do i",
-        "news about", "updates on", "launches", "release", "projects", "github",
+        "find",
+        "search",
+        "look up",
+        "lookup",
+        "get me",
+        "fetch",
+        "latest",
+        "recent",
+        "today",
+        "this week",
+        "top",
+        "best",
+        "trending",
+        "what are the",
+        "when did",
+        "who is the",
+        "where can i",
+        "how do i",
+        "news about",
+        "updates on",
+        "launches",
+        "release",
+        "projects",
+        "github",
+        "review",
+        "reviews",
+        "movie",
+        "movies",
+        "film",
+        "imdb",
+        "rotten",
+        "critic",
+        "critics",
+        "rating",
+        "ratings",
+        "box office",
+        "sequel",
+        "trailer",
+        "cast of",
+        "episode",
+        "worth watching",
+        "tell me the",
+        "are you sure",
+        "correct",
+        "accurate",
+        "sources",
+        "source for",
     )
     return any(t in lower for t in triggers)
+
+
+def _dedupe_entries_by_source(entries: list[Any], max_keep: int = 12) -> list[Any]:
+    """Drop duplicate URLs (common with editorial listicles); keep order."""
+    seen: set[str] = set()
+    out: list[Any] = []
+    for e in entries or []:
+        src = (getattr(e, "source", "") or "").strip()
+        key = src.split("#")[0].rstrip("/").lower() if src.startswith("http") else f"c:{hash((getattr(e, 'content', '') or '')[:300])}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(e)
+        if len(out) >= max_keep:
+            break
+    return out
 
 
 def _search_wants_detail(query: str) -> bool:
@@ -263,72 +322,108 @@ def _fetched_response_from_entries(query: str, entries: list, detailed: bool = F
     return "\n".join(lines)
 
 
+async def _chat_retrieval_stack(search_q: str, display_q: str, detailed_search: bool) -> str | None:
+    """Run deep search / search_web / crawl / fetch. Returns visible text or None."""
+    from apps.backend.actions.cloudflare_crawl import _available as crawl_available, crawl_urls
+    from apps.backend.actions.registry import run_action
+
+    if getattr(settings, "chat_web_search_enabled", False) and getattr(settings, "chat_deep_mode_enabled", True):
+        from apps.backend.deep_search import run_deep_search
+
+        deep_response = await run_deep_search(search_q)
+        if deep_response:
+            return deep_response
+    entries = await run_action("search_web", {"q": search_q, "top_n": 8})
+    entries = _dedupe_entries_by_source(entries, 12)
+    if not entries:
+        return None
+
+    if crawl_available():
+        urls = []
+        for e in entries[:6]:
+            src = (getattr(e, "source", "") or "").strip()
+            if src and src.startswith("http"):
+                urls.append(src)
+        if urls:
+            records = await crawl_urls(urls[:3], limit_per_url=1, formats=["markdown"], render=False)
+            crawl_text = _crawl_response_from_records(display_q, records, detailed=detailed_search)
+            if crawl_text:
+                return crawl_text
+    urls = []
+    for e in entries[:6]:
+        src = (getattr(e, "source", "") or "").strip()
+        if src and src.startswith("http"):
+            urls.append(src)
+    if urls:
+        fetched = await run_action("web_fetch", {"urls": urls[:3]})
+        fetched_text = _fetched_response_from_entries(display_q, fetched, detailed=detailed_search)
+        if fetched_text:
+            return fetched_text
+    return _search_response_from_entries(display_q, entries, detailed=detailed_search)
+
+
 @app.get("/chat")
 async def chat(q: str = "") -> dict[str, str]:
     """
-    Short-query path: single LLM call, no cohort.
-    If the query looks like search intent (find, latest, search...), run web search
-    first and feed snippets to the LLM so the answer uses real results.
+    Short-query path: structured gate (web vs direct), refined search queries, anti-hallucination prompt.
     """
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
     if len(q) > 10000:
         raise HTTPException(status_code=400, detail="Query too long (max 10000 characters)")
-    from apps.backend.actions.registry import run_action
+    from apps.backend.chat_routing import run_chat_web_route
     from apps.backend.llm.engine import get_llm
+    from apps.backend.models.schemas import ChatWebRoute
 
     query = q.strip()
     detailed_search = _search_wants_detail(query)
-    # Search-like chat queries should return retrieval-backed answers with detail.
-    if _chat_looks_like_search(query):
-        try:
-            if getattr(settings, "chat_web_search_enabled", False) and getattr(settings, "chat_deep_mode_enabled", True):
-                from apps.backend.deep_search import run_deep_search
-                deep_response = await run_deep_search(query)
-                if deep_response:
-                    return {"response": await _ensure_english_response(deep_response)}
-            entries = await run_action("search_web", {"q": query, "top_n": 5})
-            if entries:
-                from apps.backend.actions.cloudflare_crawl import _available as crawl_available, crawl_urls
 
-                if crawl_available():
-                    urls = []
-                    for e in entries[:5]:
-                        src = (getattr(e, "source", "") or "").strip()
-                        if src and src.startswith("http"):
-                            urls.append(src)
-                    if urls:
-                        records = await crawl_urls(urls[:3], limit_per_url=1, formats=["markdown"], render=False)
-                        crawl_text = _crawl_response_from_records(query, records, detailed=detailed_search)
-                        if crawl_text:
-                            return {"response": await _ensure_english_response(crawl_text)}
-                urls = []
-                for e in entries[:5]:
-                    src = (getattr(e, "source", "") or "").strip()
-                    if src and src.startswith("http"):
-                        urls.append(src)
-                if urls:
-                    fetched = await run_action("web_fetch", {"urls": urls[:3]})
-                    fetched_text = _fetched_response_from_entries(query, fetched, detailed=detailed_search)
-                    if fetched_text:
-                        return {"response": await _ensure_english_response(fetched_text)}
-                return {
-                    "response": await _ensure_english_response(
-                        _search_response_from_entries(query, entries, detailed=detailed_search)
-                    )
-                }
-        except Exception as e:
-            logger.warning("Chat web search failed (continuing without): %s", e)
+    route = await run_chat_web_route(query)
+    if route is None:
+        route = ChatWebRoute()
+
+    if route.ask_user_first and (route.ask_user_message or "").strip():
+        return {"response": (route.ask_user_message or "").strip()}
+
+    heuristic_search = _chat_looks_like_search(query)
+    effective_web = bool(route.needs_web or heuristic_search)
+    search_q = (route.search_query or "").strip() or query
+
+    if effective_web:
+        if not getattr(settings, "chat_web_search_enabled", False):
+            return {
+                "response": (
+                    "I would need live web search to answer that without guessing, "
+                    "but CHAT_WEB_SEARCH_ENABLED is off on this server. "
+                    "Turn it on in the backend environment, or use a host where search is enabled."
+                )
+            }
+        try:
+            text = await _chat_retrieval_stack(search_q, query, detailed_search)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Chat web retrieval failed: %s", e)
+            text = None
+        if text:
+            return {"response": await _ensure_english_response(text)}
+        return {
+            "response": (
+                "Web search did not return usable results. "
+                "Try a more specific query with a full name, title, year, or product name."
+            )
+        }
 
     llm = get_llm()
     prompt = (
-        "Answer in English only. "
-        "Answer concisely in 2-3 sentences. "
-        "Do not use markdown or bullet points. "
+        "You are a careful assistant.\n"
+        "Answer in English only, in 2-4 short sentences. Do not use markdown or bullet lists.\n"
+        "If you are not sure, say you are not sure. Do not invent movie titles, people, dates, "
+        "statistics, reviews, box office numbers, or current events.\n"
+        "If the question needs fresh news or niche facts you cannot verify from general knowledge, "
+        "say you cannot confirm without a web search.\n"
         f"Question: {query}"
     )
     try:
-        response = await llm.generate(prompt, max_tokens=200, json_mode=False)
+        response = await llm.generate(prompt, max_tokens=220, json_mode=False)
         return {"response": await _ensure_english_response((response or "").strip())}
     except Exception as e:
         logger.warning("Chat LLM failed: %s", e)

@@ -199,6 +199,10 @@ class MockProvider(LLMProvider):
             return '{"steps": [{"action": "web_fetch", "params": {"urls": []}}]}'
         if "title" in prompt and "key_fields" in prompt:
             return '{"title": "Test title", "summary": "Test summary", "key_fields": {"source": "mock"}}'
+        if "chat_web_route_v1" in prompt:
+            return (
+                '{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}'
+            )
         return "{}"
 
 

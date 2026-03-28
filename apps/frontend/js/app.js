@@ -24,7 +24,12 @@ let clockIntervalId = null;
 function looksLikeSearch(q) {
   const lower = (q || "").trim().toLowerCase();
   if (lower.length < 4) return false;
-  const triggers = ["find", "search", "look up", "lookup", "get me", "fetch", "latest", "recent", "today", "this week", "top", "best", "trending", "what are the", "news about", "updates on", "launches", "release", "projects", "github"];
+  const triggers = [
+    "find", "search", "look up", "lookup", "get me", "fetch", "latest", "recent", "today", "this week",
+    "top", "best", "trending", "what are the", "news about", "updates on", "launches", "release", "projects", "github",
+    "review", "reviews", "movie", "movies", "film", "imdb", "rotten", "critic", "rating", "ratings", "box office",
+    "sequel", "trailer", "tell me the", "are you sure", "sources",
+  ];
   return triggers.some(t => lower.includes(t));
 }
 

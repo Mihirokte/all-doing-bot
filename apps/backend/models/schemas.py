@@ -141,6 +141,15 @@ class MemoryContext(BaseModel):
     long_term: list[MemoryHit] = Field(default_factory=list)
 
 
+class ChatWebRoute(BaseModel):
+    """Binary routing for GET /chat: web retrieval vs direct answer, plus search query rewrite."""
+
+    needs_web: bool = False
+    ask_user_first: bool = False
+    ask_user_message: str = ""
+    search_query: str = ""
+
+
 class WorkflowSaveBody(BaseModel):
     """POST body for deterministic task/note workflows."""
 
