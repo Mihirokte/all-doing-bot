@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from apps.backend.db.models import Entry
 from apps.backend.main import app
-from apps.backend.models.schemas import ParsedIntent, PlanOutput, PlanStep
+from apps.backend.models.schemas import ParsePlanGraphOutcome, ParsedIntent, PlanOutput, PlanStep
 from apps.backend.pipeline.router import run_pipeline
 
 client = TestClient(app)
@@ -60,7 +60,7 @@ def test_status_returns_processing_then_completed() -> None:
         with patch(
             "apps.backend.agents.parse_plan.run_parse_plan_langgraph",
             new_callable=AsyncMock,
-            return_value=(parsed, plan),
+            return_value=ParsePlanGraphOutcome(parsed=parsed, plan=plan, stage_analyses=[]),
         ), patch(
             "apps.backend.pipeline.executor.run_action_strict", new_callable=AsyncMock
         ) as mock_run:

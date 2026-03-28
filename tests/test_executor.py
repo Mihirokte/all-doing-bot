@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from apps.backend.models.schemas import ParsedIntent, PlanStep
+from apps.backend.models.schemas import ParsePlanGraphOutcome, ParsedIntent, PlanStep
 from apps.backend.pipeline.executor import (
     _is_search_intent,
     _resolve_step,
@@ -118,7 +118,9 @@ def test_run_full_pipeline_multistep_includes_diagnostics() -> None:
 
     async def run() -> None:
         with patch(
-            "apps.backend.agents.parse_plan.run_parse_plan_langgraph", new_callable=AsyncMock, return_value=(parsed, plan)
+            "apps.backend.agents.parse_plan.run_parse_plan_langgraph",
+            new_callable=AsyncMock,
+            return_value=ParsePlanGraphOutcome(parsed=parsed, plan=plan, stage_analyses=[]),
         ), patch("apps.backend.pipeline.executor.run_action", new_callable=AsyncMock) as mock_run:
             from apps.backend.db.models import Entry
 

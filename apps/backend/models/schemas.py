@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -83,6 +84,32 @@ class PlanOutput(BaseModel):
     """Output of Plan stage: list of steps."""
 
     steps: list[PlanStep] = Field(default_factory=list)  # list[] ok on 3.9
+
+
+class PipelineStageAuditVerdict(str, Enum):
+    """Local LLM audit verdict after parse or plan (one structured question per graph stage)."""
+
+    sound = "sound"
+    needs_clarification = "needs_clarification"
+    ambiguous_intent = "ambiguous_intent"
+    plan_mismatch = "plan_mismatch"
+    incomplete = "incomplete"
+
+
+class PipelineStageAnalysis(BaseModel):
+    """Structured audit for one LangGraph stage (parse or plan)."""
+
+    stage: str
+    verdict: PipelineStageAuditVerdict
+    rationale: str = ""
+
+
+class ParsePlanGraphOutcome(BaseModel):
+    """Result of parse→plan LangGraph including per-stage agent audits."""
+
+    parsed: Optional[ParsedIntent] = None
+    plan: Optional[PlanOutput] = None
+    stage_analyses: List[PipelineStageAnalysis] = Field(default_factory=list)
 
 
 class ParseAndPlanOutput(BaseModel):

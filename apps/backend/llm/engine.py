@@ -203,6 +203,8 @@ class MockProvider(LLMProvider):
             return (
                 '{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}'
             )
+        if "pipeline_stage_audit_v1" in prompt:
+            return '{"verdict": "sound", "rationale": "mock stage audit"}'
         return "{}"
 
 

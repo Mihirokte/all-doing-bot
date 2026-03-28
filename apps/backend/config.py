@@ -73,6 +73,8 @@ class Settings(BaseSettings):
     # Queue orchestration tuning.
     queue_step_poll_interval_seconds: float = 1.5
     queue_step_poll_timeout_seconds: float = 300.0
+    # After parse and after plan, one local structured LLM call classifies stage quality (enum verdict).
+    pipeline_stage_audit_enabled: bool = True
     # Search: default is MCP (required stack). Set CONNECTOR_SEARCH_DEFAULT_PROVIDER=searxng only if you intentionally use SearXNG instead.
     connector_search_default_provider: str = "mcp"
     # Required when provider is mcp: JSON array of argv to start your MCP server (stdio), e.g. '["npx","-y","your-mcp-server"]'.

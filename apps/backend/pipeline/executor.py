@@ -338,7 +338,16 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
         from apps.backend.agents.parse_plan import run_parse_plan_langgraph
 
         try:
-            parsed, plan = await run_parse_plan_langgraph(query_with_memory)
+            pp_outcome = await run_parse_plan_langgraph(query_with_memory)
+            parsed, plan = pp_outcome.parsed, pp_outcome.plan
+            for sa in pp_outcome.stage_analyses:
+                log_run_event(
+                    "stage_audit",
+                    run_id=task_id,
+                    stage=sa.stage,
+                    outcome=sa.verdict.value,
+                    rationale_len=len(sa.rationale or ""),
+                )
         except Exception as parse_plan_exc:
             error_msg = f"Parse+plan stage exception: {parse_plan_exc}"
             logger.error("Parse+plan failed for task %s: %s", task_id, parse_plan_exc)
@@ -420,37 +429,45 @@ async def run_full_pipeline(task_id: str, query: str, session_key: str = "defaul
             execution_mode=execution_mode,
             dead_letter_count=len(dead_letters),
         )
+        stage_analyses_payload = [a.model_dump(mode="json") for a in pp_outcome.stage_analyses]
+        raw_payload: dict[str, Any] | None = None
+        if steps_diagnostics or stage_analyses_payload:
+            raw_payload = {
+                "stage_analyses": stage_analyses_payload,
+            }
+            if steps_diagnostics:
+                raw_payload.update(
+                    {
+                        "steps": steps_diagnostics,
+                        "tool_path": [s.get("action") for s in steps_diagnostics if s.get("action")],
+                        "connector_path": [
+                            f"{s.get('connector_id')}:{s.get('provider_key')}"
+                            for s in steps_diagnostics
+                            if s.get("connector_id") and s.get("provider_key")
+                        ],
+                        "execution_mode": execution_mode,
+                        "dead_letters": dead_letters,
+                        "policy_outcomes": [
+                            {
+                                "action": s.get("action"),
+                                "policy_decision": s.get("policy_decision", "allow"),
+                                "error_code": s.get("error_code"),
+                            }
+                            for s in steps_diagnostics
+                        ],
+                        "memory_hits": {
+                            "short_term": [m.model_dump() for m in memory_context.short_term],
+                            "long_term": [m.model_dump() for m in memory_context.long_term],
+                        },
+                    }
+                )
         task_store.set_result(
             task_id,
             TaskResult(
                 cohort_name=cohort_name,
                 entries_added=len(entries),
                 message=f"Created/updated cohort '{cohort_name}' with {len(entries)} entries.",
-                raw={
-                    "steps": steps_diagnostics,
-                    "tool_path": [s.get("action") for s in steps_diagnostics if s.get("action")],
-                    "connector_path": [
-                        f"{s.get('connector_id')}:{s.get('provider_key')}"
-                        for s in steps_diagnostics
-                        if s.get("connector_id") and s.get("provider_key")
-                    ],
-                    "execution_mode": execution_mode,
-                    "dead_letters": dead_letters,
-                    "policy_outcomes": [
-                        {
-                            "action": s.get("action"),
-                            "policy_decision": s.get("policy_decision", "allow"),
-                            "error_code": s.get("error_code"),
-                        }
-                        for s in steps_diagnostics
-                    ],
-                    "memory_hits": {
-                        "short_term": [m.model_dump() for m in memory_context.short_term],
-                        "long_term": [m.model_dump() for m in memory_context.long_term],
-                    },
-                }
-                if steps_diagnostics
-                else None,
+                raw=raw_payload,
             ),
         )
         await memory_store.append_short_term(session_key=session_key, role="user", content=query)
