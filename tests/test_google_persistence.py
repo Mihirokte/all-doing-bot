@@ -72,6 +72,34 @@ def _mock_spreadsheet():
 
 
 @patch("apps.backend.db.google_client.get_or_create_spreadsheet")
+def test_google_sheets_retries_transient_failure(get_spreadsheet_mock):
+    spread = _mock_spreadsheet()
+    spread.worksheet("cohort_a")
+    get_spreadsheet_mock.return_value = spread
+
+    from apps.backend.db.google_sheets import GoogleSheets
+
+    gs = GoogleSheets()
+    attempts = {"n": 0}
+    orig = gs._add_entries_sync
+
+    def flaky(name, entries):
+        attempts["n"] += 1
+        if attempts["n"] < 3:
+            raise Exception("503 Service Unavailable")
+        return orig(name, entries)
+
+    gs._add_entries_sync = flaky
+    entries = [
+        Entry(content="retry_ok", source="s", metadata="{}", created_at="2025-01-01T00:00:00Z"),
+    ]
+    asyncio.run(gs.add_entries("cohort_a", entries))
+    assert attempts["n"] == 3
+    got = asyncio.run(gs.get_entries("cohort_a", limit=10, offset=0))
+    assert any(e.content == "retry_ok" for e in got)
+
+
+@patch("apps.backend.db.google_client.get_or_create_spreadsheet")
 def test_google_sheets_add_and_get_entries(get_spreadsheet_mock, tmp_path):
     spread = _mock_spreadsheet()
     spread.worksheet("cohort_a")  # create cohort sheet with header

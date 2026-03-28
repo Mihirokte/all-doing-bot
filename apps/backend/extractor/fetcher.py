@@ -1,12 +1,18 @@
-"""Async HTTP fetch with timeout, browser-like headers, and retries."""
+"""Async HTTP fetch with timeout, browser-like headers, retries, and per-host spacing."""
 from __future__ import annotations
 
 import asyncio
 import logging
+from urllib.parse import urlparse
 
 import httpx
 
+from apps.backend.config import settings
+
 logger = logging.getLogger(__name__)
+
+_domain_lock = asyncio.Lock()
+_domain_last_fetch_mono: dict[str, float] = {}
 
 DEFAULT_TIMEOUT = 15.0
 DEFAULT_HEADERS = {
@@ -18,6 +24,33 @@ DEFAULT_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
 }
+
+
+def _fetch_host_key(url: str) -> str | None:
+    try:
+        netloc = (urlparse(url).netloc or "").lower()
+        if not netloc:
+            return None
+        return netloc.split("@")[-1]
+    except Exception:  # noqa: BLE001
+        return None
+
+
+async def _respect_domain_interval(url: str) -> None:
+    min_s = float(getattr(settings, "fetch_min_interval_seconds_per_domain", 1.0) or 0.0)
+    if min_s <= 0:
+        return
+    host = _fetch_host_key(url)
+    if not host:
+        return
+    loop = asyncio.get_running_loop()
+    async with _domain_lock:
+        now = loop.time()
+        last = _domain_last_fetch_mono.get(host, 0.0)
+        wait = min_s - (now - last)
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _domain_last_fetch_mono[host] = loop.time()
 
 
 async def fetch_response(
@@ -32,6 +65,7 @@ async def fetch_response(
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, headers=merged_headers) as client:
         for attempt in range(3):
             try:
+                await _respect_domain_interval(url)
                 response = await client.get(url)
                 if response.status_code == 429:
                     retry_after_header = response.headers.get("Retry-After")

@@ -7,6 +7,7 @@ from typing import Any
 
 from apps.backend.config import settings
 from apps.backend.db.models import Cohort
+from apps.backend.db.sheets_retry import run_sync_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -124,16 +125,18 @@ class GoogleCatalogue:
             logger.warning("Could not delete worksheet %s: %s", sheet_name, e)
 
     async def list_cohorts(self) -> list[Cohort]:
-        return await asyncio.to_thread(self._list_cohorts_sync)
+        return await run_sync_with_retry(self._list_cohorts_sync, operation="google_catalogue.list_cohorts")
 
     async def get_cohort(self, name: str) -> Cohort | None:
-        return await asyncio.to_thread(self._get_cohort_sync, name)
+        return await run_sync_with_retry(self._get_cohort_sync, name, operation="google_catalogue.get_cohort")
 
     async def create_cohort(self, cohort: Cohort) -> None:
-        await asyncio.to_thread(self._create_cohort_sync, cohort)
+        await run_sync_with_retry(self._create_cohort_sync, cohort, operation="google_catalogue.create_cohort")
 
     async def update_cohort(self, name: str, updates: dict[str, Any]) -> None:
-        await asyncio.to_thread(self._update_cohort_sync, name, updates)
+        await run_sync_with_retry(
+            self._update_cohort_sync, name, updates, operation="google_catalogue.update_cohort"
+        )
 
     async def delete_cohort(self, name: str) -> None:
-        await asyncio.to_thread(self._delete_cohort_sync, name)
+        await run_sync_with_retry(self._delete_cohort_sync, name, operation="google_catalogue.delete_cohort")

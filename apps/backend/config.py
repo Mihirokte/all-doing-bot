@@ -26,6 +26,11 @@ class Settings(BaseSettings):
     spreadsheet_id: str = ""
     # If set, find existing spreadsheet by this title or create it. Ignored when SPREADSHEET_ID is set.
     google_sheets_spreadsheet_name: str = "all-doing-bot cohorts"
+    # Transient API failures (429, 5xx, timeouts): retry sync gspread calls in a thread.
+    google_sheets_retry_attempts: int = 3
+    google_sheets_retry_base_delay_seconds: float = 1.0
+    # Minimum seconds between HTTP GETs to the same host (implementation plan: polite fetching).
+    fetch_min_interval_seconds_per_domain: float = 1.0
 
     # LLM provider selection (ollama = local Ollama server, e.g. qwen3.5:4b)
     # Default is local-first Qwen runtime; remote provider is opt-in only.

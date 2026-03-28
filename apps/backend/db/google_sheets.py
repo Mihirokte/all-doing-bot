@@ -1,17 +1,15 @@
 """Google Sheets implementation for cohort data. Used when credentials are present."""
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from datetime import datetime, timezone
 
-from apps.backend.config import settings
 from apps.backend.db.models import Entry
+from apps.backend.db.sheets_retry import run_sync_with_retry
 
 logger = logging.getLogger(__name__)
 
-_CATALOGUE_SHEET = "_catalogue"
 _HEADER_ENTRIES = ["entry_id", "content", "source", "metadata", "created_at"]
 
 
@@ -80,7 +78,18 @@ class GoogleSheets:
         return out[offset : offset + limit]
 
     async def add_entries(self, cohort_name: str, entries: list[Entry]) -> None:
-        await asyncio.to_thread(self._add_entries_sync, cohort_name, entries)
+        await run_sync_with_retry(
+            self._add_entries_sync,
+            cohort_name,
+            entries,
+            operation="google_sheets.add_entries",
+        )
 
     async def get_entries(self, cohort_name: str, limit: int = 100, offset: int = 0) -> list[Entry]:
-        return await asyncio.to_thread(self._get_entries_sync, cohort_name, limit, offset)
+        return await run_sync_with_retry(
+            self._get_entries_sync,
+            cohort_name,
+            limit,
+            offset,
+            operation="google_sheets.get_entries",
+        )
