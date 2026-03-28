@@ -18,7 +18,7 @@ After **any** change under `apps/backend/` (or anything that affects the running
 2. **Run the remote update** (same steps as `.github/workflows/deploy-ec2.yml`):
    - **Windows (PowerShell):**  
      `powershell -NoProfile -ExecutionPolicy Bypass -File apps/backend/deploy/Invoke-Ec2BackendUpdate.ps1`  
-     with `EC2_HOST` set (and `EC2_USER` / `SSH_KEY` if not default). The script pipes `ec2-pull-restart.sh` to `ssh user@host bash -s`.
+     with `EC2_HOST` set (and `EC2_USER` e.g. `ec2-user` on Amazon Linux, `ubuntu` on Ubuntu AMIs, plus `SSH_KEY` if needed). The script uses **scp** then **ssh** to run `ec2-pull-restart.sh` on the host.
    - **macOS / Linux / Git Bash:**  
      `EC2_HOST=... EC2_USER=ubuntu ./apps/backend/deploy/ec2-ssh-pull-restart-from-local.sh`
 3. **If SSH is not possible** (no key in this environment, headless CI without secrets): state that explicitly in the reply and tell the human to run one of the commands above or **Actions → Deploy backend (EC2) → Run workflow** (requires repo secrets `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).

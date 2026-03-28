@@ -3,12 +3,12 @@
   Updates the production backend on EC2 over SSH (git pull main, pip, restart alldoing).
 
 .DESCRIPTION
-  Pipes ec2-pull-restart.sh to the remote shell so behavior matches .github/workflows/deploy-ec2.yml.
-  Required: OpenSSH client (ssh). Optional: Git for Windows includes ssh.
+  Copies ec2-pull-restart.sh with scp, runs it on the host, then deletes it (avoids Windows CRLF on ssh stdin).
+  Requires OpenSSH ssh and scp (Windows optional feature "OpenSSH Client").
 
   Environment (or pass parameters):
     EC2_HOST     — e.g. ec2-54-165-94-30.compute-1.amazonaws.com
-    EC2_USER     — ubuntu or ec2-user (default: ubuntu)
+    EC2_USER     — ec2-user (Amazon Linux) or ubuntu (Ubuntu AMI); default ubuntu
     SSH_KEY      — path to .pem (optional if ssh uses your default key / ssh-agent)
 
 .EXAMPLE
@@ -34,13 +34,19 @@ if (-not (Test-Path $remoteScript)) {
 }
 
 $target = "${Ec2User}@${Ec2Host}"
-$sshArgs = @("-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15")
+$sshOpts = @("-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15")
 if ($SshKey) {
-    $sshArgs += @("-i", $SshKey)
+    $sshOpts += @("-i", $SshKey)
 }
 
-Write-Host '[deploy] SSH' $target '- running ec2-pull-restart.sh ...'
-Get-Content -Raw -Encoding utf8 $remoteScript | & ssh @sshArgs $target "bash -s"
+$remoteTmp = "/tmp/ec2-pull-restart-all-doing.sh"
+Write-Host '[deploy] SCP' $remoteScript '->' $target ':' $remoteTmp
+& scp @sshOpts $remoteScript "${target}:${remoteTmp}"
+if ($LASTEXITCODE -ne 0) {
+    throw "scp failed (exit $LASTEXITCODE). Is OpenSSH scp in PATH?"
+}
+Write-Host '[deploy] SSH' $target '- bash' $remoteTmp
+& ssh @sshOpts $target "chmod +x ${remoteTmp} && bash ${remoteTmp}; ec=`$?; rm -f ${remoteTmp}; exit `$ec"
 if ($LASTEXITCODE -ne 0) {
     throw "Remote update failed (exit $LASTEXITCODE)."
 }

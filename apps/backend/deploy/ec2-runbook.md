@@ -44,13 +44,13 @@ This instance has **no key pair** in the launch config. Use **EC2 Instance Conne
    ```text
    Host all-doing-ec2
        HostName ec2-54-165-94-30.compute-1.amazonaws.com
-       User ubuntu
+       User ec2-user
        IdentityFile ~/.ssh/alldoing_ec2
        IdentitiesOnly yes
        StrictHostKeyChecking accept-new
    ```
 
-   Amazon Linux images often use **`User ec2-user`** instead of `ubuntu`.
+   Ubuntu AMIs use **`User ubuntu`** instead of `ec2-user` — match the image you launched.
 
 4. **Connect:** `ssh all-doing-ec2`
 
@@ -138,7 +138,8 @@ bash apps/backend/deploy/ec2-ssh-pull-restart-from-local.sh
 
 ```powershell
 $env:EC2_HOST = 'ec2-54-165-94-30.compute-1.amazonaws.com'
-$env:SSH_KEY = "$env:USERPROFILE\.ssh\your-key.pem"   # if needed
+$env:EC2_USER = 'ec2-user'   # Amazon Linux; use ubuntu for Ubuntu AMIs
+$env:SSH_KEY = "$env:USERPROFILE\.ssh\alldoing_ec2"   # if needed
 powershell -NoProfile -ExecutionPolicy Bypass -File apps/backend/deploy/Invoke-Ec2BackendUpdate.ps1
 ```
 

@@ -1,0 +1,2 @@
+# Shell scripts must use LF so piping from Windows (Invoke-Ec2BackendUpdate.ps1) works on Linux.
+*.sh text eol=lf

@@ -13,8 +13,8 @@ After editing files in this repo, **always** commit and push to GitHub so the re
 4. If the change was in **apps/frontend**, also update GitHub Pages:  
    `git subtree push --prefix apps/frontend origin gh-pages` (or subtree split + force-push to `gh-pages` if non-fast-forward).
 5. If the change was in **apps/backend/** (or otherwise affects the EC2 FastAPI service), **mandatory:** update production over **SSH** after push, using the same steps as `.github/workflows/deploy-ec2.yml`:
-   - PowerShell: set `EC2_HOST` (and `EC2_USER` / `SSH_KEY` if needed), then  
-     `powershell -NoProfile -ExecutionPolicy Bypass -File apps/backend/deploy/Invoke-Ec2BackendUpdate.ps1`
+   - PowerShell: set `EC2_HOST` (and `EC2_USER` e.g. `ec2-user` or `ubuntu`, `SSH_KEY` if needed), then  
+     `powershell -NoProfile -ExecutionPolicy Bypass -File apps/backend/deploy/Invoke-Ec2BackendUpdate.ps1` (uses scp+ssh)
    - Bash: `EC2_HOST=... ./apps/backend/deploy/ec2-ssh-pull-restart-from-local.sh`  
    If SSH keys are not available in this environment, say so and instruct the human to run that script or **Actions → Deploy backend (EC2) → Run workflow**. Do not treat the task as fully done without this deploy or an explicit handoff.
 
