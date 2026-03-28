@@ -1,0 +1,152 @@
+/** Auth: Google Sign-In with 30-day login cache. No Phaser dependency. */
+
+const CLIENT_ID = typeof window !== "undefined" && window.GOOGLE_CLIENT_ID
+  ? window.GOOGLE_CLIENT_ID
+  : "YOUR_GOOGLE_CLIENT_ID_HERE";
+
+const LOGIN_CACHE_KEY  = "allDoingBotLoggedInAt";
+const SESSION_KEY_STORAGE = "allDoingSessionKey";
+const LOGIN_CACHE_DAYS = 30;
+
+let isAuthenticated = false;
+
+function parseJwtSub(credential) {
+  try {
+    const parts = String(credential).split(".");
+    if (parts.length < 2) return "default";
+    let b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const pad = b64.length % 4;
+    if (pad) b64 += "=".repeat(4 - pad);
+    const json = JSON.parse(atob(b64));
+    return String(json.sub || json.email || "default");
+  } catch (e) {
+    return "default";
+  }
+}
+
+function persistSessionKey(sk) {
+  try {
+    localStorage.setItem(SESSION_KEY_STORAGE, String(sk || "default"));
+  } catch (e) { /* ignore */ }
+}
+
+function readStoredSessionKey() {
+  try {
+    return localStorage.getItem(SESSION_KEY_STORAGE) || "default";
+  } catch (e) {
+    return "default";
+  }
+}
+
+window.getSessionKey = function () {
+  if (typeof window.SESSION_KEY === "string" && window.SESSION_KEY.length) return window.SESSION_KEY;
+  return readStoredSessionKey();
+};
+
+/** Sync session across tabs; reload when another tab signs out. */
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", function (ev) {
+    if (ev.key === LOGIN_CACHE_KEY && ev.newValue === null) {
+      window.location.reload();
+      return;
+    }
+    if (ev.key === SESSION_KEY_STORAGE && typeof ev.newValue === "string" && ev.newValue.length) {
+      window.SESSION_KEY = ev.newValue;
+    }
+  });
+}
+
+function isLocalHost() {
+  return typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+}
+
+function persistLogin() {
+  try { localStorage.setItem(LOGIN_CACHE_KEY, String(Date.now())); }
+  catch (e) { console.warn("[auth] localStorage unavailable:", e.message); }
+}
+
+function hasValidCachedLogin() {
+  try {
+    const raw = localStorage.getItem(LOGIN_CACHE_KEY);
+    if (!raw) return false;
+    const t = parseInt(raw, 10);
+    if (isNaN(t)) return false;
+    return Date.now() - t < LOGIN_CACHE_DAYS * 86400000;
+  } catch (e) { return false; }
+}
+
+function clearLoginCache() {
+  try { localStorage.removeItem(LOGIN_CACHE_KEY); } catch (e) {}
+}
+
+function handleCredentialResponse(response) {
+  if (typeof response.credential === "string") {
+    console.log("[auth] Google Sign-In OK");
+    const sk = parseJwtSub(response.credential);
+    window.SESSION_KEY = sk;
+    persistSessionKey(sk);
+  }
+  isAuthenticated = true;
+  persistLogin();
+  unlockSystem();
+}
+
+function unlockSystem() {
+  if (!window.SESSION_KEY) window.SESSION_KEY = readStoredSessionKey();
+  document.getElementById("login-overlay").style.display = "none";
+  document.getElementById("terminal-root").style.display  = "flex";
+  document.getElementById("terminal-root").style.flexDirection = "column";
+  if (typeof window.appBoot === "function") window.appBoot();
+}
+
+function initGoogleAuth() {
+  // Show dev bypass only on localhost
+  const devBtn = document.getElementById("dev-bypass-btn");
+  if (devBtn) {
+    if (isLocalHost()) {
+      devBtn.classList.add("visible");
+      devBtn.addEventListener("click", () => {
+        isAuthenticated = true;
+        window.SESSION_KEY = "local-dev";
+        persistSessionKey("local-dev");
+        persistLogin();
+        unlockSystem();
+      });
+    }
+  }
+
+  const fromCache = hasValidCachedLogin();
+  if (fromCache) {
+    const sk = readStoredSessionKey();
+    if (!sk || sk === "default") {
+      clearLoginCache();
+    } else {
+      isAuthenticated = true;
+      window.SESSION_KEY = sk;
+      unlockSystem();
+      return;
+    }
+  }
+
+  if (window.google && window.google.accounts) {
+    window.google.accounts.id.initialize({
+      client_id: CLIENT_ID,
+      callback: handleCredentialResponse,
+    });
+    window.google.accounts.id.renderButton(
+      document.getElementById("g_id_onload"),
+      { theme: "filled_black", size: "large", text: "sign_in_with" }
+    );
+    window.google.accounts.id.prompt();
+  } else {
+    console.error("[auth] Google library not loaded");
+  }
+}
+
+// Expose sign-out helper
+window.clearAllDoingLoginCache = function () {
+  clearLoginCache();
+  try { localStorage.removeItem(SESSION_KEY_STORAGE); } catch (e) {}
+  window.location.reload();
+};

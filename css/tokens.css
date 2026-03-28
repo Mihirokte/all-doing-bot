@@ -1,0 +1,48 @@
+/* Design tokens only — see docs/reconstruction/DESIGN_SYSTEM.md */
+
+:root {
+  --bg-base: #070809;
+  --bg-elevated: #0c0f12;
+  --bg-surface: #11161c;
+  --bg-surface-hover: #171d26;
+  --bg-inset: #050607;
+
+  --accent-primary: #3de1a8;
+  --accent-primary-dim: rgba(61, 225, 168, 0.14);
+  --accent-secondary: #6b9fff;
+  --accent-secondary-dim: rgba(107, 159, 255, 0.12);
+
+  --danger: #ff6b6b;
+  --warning: #e8c547;
+
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa3b2;
+  --text-tertiary: #5c6570;
+
+  --border-subtle: #1e242d;
+  --border-default: #2a313c;
+  --border-strong: #3d4654;
+
+  --shadow-glow-primary: 0 0 28px rgba(61, 225, 168, 0.11);
+  --shadow-glow-secondary: 0 0 22px rgba(107, 159, 255, 0.09);
+  --shadow-elevated: -12px 0 48px rgba(0, 0, 0, 0.55);
+
+  /* legacy aliases (JS + older rules) */
+  --bg: var(--bg-base);
+  --bg2: var(--bg-elevated);
+  --bg3: var(--bg-surface);
+  --border: var(--border-default);
+  --text: var(--text-primary);
+  --text-dim: var(--text-secondary);
+  --muted: var(--text-tertiary);
+  --cyan: var(--accent-secondary);
+  --green: var(--accent-primary);
+  --amber: var(--warning);
+  --red: var(--danger);
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --radius-lg: 14px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --intel-breakpoint: 901px;
+}

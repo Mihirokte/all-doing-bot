@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0c0f" />
+  <title>ALL-DOING // intel terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="theme-hacker">
+
+  <!-- LOGIN SCREEN -->
+  <div id="login-overlay">
+    <div class="login-panel frame-corners">
+      <div class="login-glitch" aria-hidden="true">// SECURE CHANNEL</div>
+      <div class="login-header">
+        <h1>ALL-DOING</h1>
+        <p class="login-tagline">local intelligence terminal</p>
+        <div class="login-status-row">
+          <span class="blink-dot"></span>
+          <span class="login-status-text">awaiting credentials</span>
+        </div>
+      </div>
+      <div class="login-divider"></div>
+      <div id="g_id_onload" class="google-btn-wrapper"></div>
+      <button id="dev-bypass-btn" class="dev-btn">Dev bypass</button>
+    </div>
+  </div>
+
+  <!-- MAIN APP (hidden until auth) -->
+  <div id="terminal-root" class="terminal-root" style="display:none">
+
+    <!-- TOP BAR -->
+    <div id="backend-banner" class="backend-banner hidden" role="alert"></div>
+
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button type="button" class="intel-toggle" id="intel-toggle" aria-label="Open session intel panel" aria-expanded="false" aria-controls="intel-deck">
+          <span class="intel-toggle-icon" aria-hidden="true"></span>
+          <span class="intel-toggle-text">INTEL</span>
+        </button>
+        <span class="top-logo"><span class="top-logo-mark">⟩</span> ALL-DOING</span>
+      </div>
+      <div class="top-bar-center">
+        <span class="top-prompt-prefix" aria-hidden="true">SYS</span>
+        <span id="sys-time" class="sys-time mono-nums"></span>
+        <span class="sys-sep" aria-hidden="true">│</span>
+        <span id="sys-status" class="sys-status online">LINK_OK</span>
+      </div>
+      <div class="top-bar-right">
+        <button class="icon-btn" id="profile-toggle" title="Profile" aria-label="Profile">DATA</button>
+        <button class="icon-btn" id="archives-toggle" title="Collections" aria-label="Collections">ARCHIVE</button>
+        <button class="icon-btn danger" id="signout-btn" title="Sign Out" aria-label="Sign out">EXIT</button>
+      </div>
+    </header>
+
+    <div class="intel-scrim" id="intel-scrim" aria-hidden="true"></div>
+
+    <!-- MAIN LAYOUT -->
+    <main class="main-layout" role="main">
+
+      <!-- LEFT COLUMN: FEED + QUERY -->
+      <section class="col-feed">
+
+        <!-- Query input -->
+        <div class="query-box frame-corners">
+          <div class="query-input-row">
+            <label class="query-compose" for="main-query">
+              <span class="input-prompt" aria-hidden="true">&gt;</span>
+              <input type="text" id="main-query" placeholder="signal in — query, task, or note..." autocomplete="off" spellcheck="false" aria-label="Query input" />
+            </label>
+            <button id="exec-btn" class="exec-btn" aria-label="Send"><span class="exec-btn-label">TRANSMIT</span></button>
+          </div>
+          <div class="query-examples workflow-modes">
+            <button type="button" class="mode-chip active" data-mode="ask" title="Chat or long research pipeline">Ask</button>
+            <button type="button" class="mode-chip" data-mode="task" title="Save a task">Task</button>
+            <button type="button" class="mode-chip" data-mode="note" title="Save a note">Note</button>
+          </div>
+        </div>
+
+        <!-- Chat thread -->
+        <div class="feed-box chat-feed">
+          <div class="feed-header">
+            <span class="feed-title"><span class="feed-prompt" aria-hidden="true">~</span> channel / ask</span>
+            <span id="task-badge" class="task-badge hidden">Processing</span>
+            <button class="clear-btn" id="clear-log" aria-label="Clear chat">Clear</button>
+          </div>
+            <div id="feed-log" class="feed-log chat-log">
+            <div class="msg msg-system" id="boot-msg">
+              <span class="msg-ts" id="boot-ts"></span>
+              <span class="msg-body">Pick a workflow above. Ask uses chat and research; Task &amp; Note save to your panels with no AI.</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RIGHT COLUMN: STATUS + SIDEBAR — drawer below 901px -->
+      <aside class="col-aside" id="intel-deck" aria-label="Session intel">
+
+        <!-- Task status -->
+        <div class="status-card">
+          <div class="card-label">Current Task</div>
+          <div id="task-status" class="task-status idle">Idle</div>
+          <div id="task-query-display" class="task-query-display"></div>
+          <div id="deep-retrieval-status" class="deep-retrieval-status hidden">Searching and analyzing...</div>
+          <div class="progress-bar-wrap hidden" id="progress-wrap">
+            <div class="progress-bar" id="progress-bar"></div>
+          </div>
+          <div id="task-id-display" class="task-id-display"></div>
+        </div>
+
+        <!-- Tasks / notes (per session, Sheets-backed) -->
+        <div class="workflow-card">
+          <div class="card-label">Tasks <button type="button" class="wf-refresh" id="refresh-workflows" title="Refresh" aria-label="Refresh tasks">&#8635;</button></div>
+          <div id="tasks-list" class="workflow-list">
+            <div class="workflow-empty">No tasks yet.</div>
+          </div>
+        </div>
+        <div class="workflow-card">
+          <div class="card-label">Notes</div>
+          <div id="notes-list" class="workflow-list">
+            <div class="workflow-empty">No notes yet.</div>
+          </div>
+        </div>
+
+        <!-- Collections sidebar -->
+        <div class="cohorts-card">
+          <div class="card-label">Collections
+            <span class="cohort-count" id="cohort-count">0</span>
+          </div>
+          <div id="cohorts-list" class="cohorts-list">
+            <div class="cohorts-empty">No collections yet.</div>
+          </div>
+        </div>
+
+        <!-- System info -->
+        <div class="metrics-card">
+          <div class="card-label">System</div>
+          <div class="metric-row">
+            <span class="metric-name">Model</span>
+            <span class="metric-val" id="metric-llm">qwen3.5:9b</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">Web search</span>
+            <span class="metric-val" id="metric-websearch">OFF</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">Backend</span>
+            <span class="metric-val" id="metric-backend">checking...</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">API</span>
+            <span class="metric-val mono-nums" id="metric-api-version" title="Reported by GET /health">—</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-name">Queries</span>
+            <span class="metric-val" id="metric-queries">0</span>
+          </div>
+        </div>
+
+      </aside>
+    </main>
+
+    <!-- PROFILE OVERLAY -->
+    <div id="profile-overlay" class="profile-overlay hidden" role="dialog" aria-label="Profile and data">
+      <div class="profile-panel">
+        <div class="profile-header">
+          <span class="profile-title">Profile &amp; Data</span>
+          <button class="profile-close" id="close-profile" aria-label="Close profile">Close</button>
+        </div>
+        <div class="profile-body">
+          <p class="profile-copy profile-workspace-line">
+            Your <strong>workspace key</strong> (sent as <code class="mono-nums">session_key</code> on every API call)
+            is <code class="mono-nums" id="profile-session-key">—</code>.
+            With Google sign-in it is your Google account subject (<code>sub</code> from the ID token), not your password.
+            Tasks, notes, chat transcripts, and pipeline memory are scoped to this key in Sheets (when configured) and on the server process.
+          </p>
+          <p class="profile-copy">
+            Clear past sessions and all cohort data stored in Google Sheets (or local fake storage).
+            This action cannot be undone.
+          </p>
+          <button id="clear-all-data-btn" class="danger-action-btn">Clear all data</button>
+          <div id="profile-status" class="profile-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARCHIVES OVERLAY -->
+    <div id="archives-overlay" class="archives-overlay hidden" role="dialog" aria-label="Collections browser">
+      <div class="archives-panel">
+        <div class="archives-header">
+          <span class="archives-title">Collections</span>
+          <button class="archives-close" id="close-archives" aria-label="Close collections">Close</button>
+        </div>
+        <div class="archives-body">
+          <div id="archives-cohorts" class="archives-cohorts"></div>
+          <div id="archives-entries" class="archives-entries">
+            <div class="entries-placeholder">Select a collection to view entries</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end #terminal-root -->
+
+  <!-- Config + wiring -->
+  <script>window.BACKEND_URL = "https://54-165-94-30.sslip.io";</script>
+  <script>window.GOOGLE_CLIENT_ID = "455801119193-lb6dehdta0ctc701gqnflgq8mtti81ct.apps.googleusercontent.com";</script>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    window.onload = function () { initGoogleAuth(); };
+  </script>
+</body>
+</html>
