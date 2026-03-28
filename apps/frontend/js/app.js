@@ -34,18 +34,25 @@ function looksLikeSearch(q) {
 }
 
 // ── Boot ─────────────────────────────────────────────────
+/** True after first full UI wiring; Google cache + One Tap can call appBoot twice — avoid duplicate listeners (double send). */
+let _appUiWired = false;
+
 window.appBoot = function () {
   initClock();
-  initWorkflowModes();
-  initQueryBox();
-  initProfile();
-  initArchives();
-  initIntelDeck();
-  initSignOut();
+  if (!_appUiWired) {
+    _appUiWired = true;
+    initWorkflowModes();
+    initQueryBox();
+    initProfile();
+    initArchives();
+    initIntelDeck();
+    initSignOut();
+  }
   loadCohorts();
   loadWorkflowPanels();
   checkBackend();
-  document.getElementById("boot-ts").textContent = nowTs();
+  const bootTs = document.getElementById("boot-ts");
+  if (bootTs) bootTs.textContent = nowTs();
 };
 
 // ── Clock ─────────────────────────────────────────────────
@@ -519,9 +526,17 @@ function appendMsg(role, body, isError, resultPayload, useHtml) {
 // Evidence-first chat: markdown links -> clickable; confidence -> badge
 function formatChatBody(text) {
   if (!text) return "";
-  const escaped = escHtml(text);
-  const withLinks = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_, label, url) =>
+  let t = String(text);
+  t = t.replace(/!\[[^\]]*\]\([^)]*\)/g, "");
+  // Wikipedia: [![thumb](//...jpg)](/wiki/File:...) — drop whole chunk
+  t = t.replace(/\[\s*!\[[^\]]*\]\([^)]+\)\s*\]\([^)]+\)/g, "");
+  t = t.replace(/\n{3,}/g, "\n\n");
+  const escaped = escHtml(t);
+  let withLinks = escaped.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_, label, url) =>
     '<a href="' + escAttr(url) + '" target="_blank" rel="noopener" class="msg-evidence-link">' + label + '</a>'
+  );
+  withLinks = withLinks.replace(/\[([^\]]+)\]\((\/wiki\/[^)\s]+)\)/g, (_, label, path) =>
+    '<a href="' + escAttr("https://en.wikipedia.org" + path) + '" target="_blank" rel="noopener" class="msg-evidence-link">' + label + '</a>'
   );
   const withConfidence = withLinks.replace(/\*Confidence: (high|medium|low)\*/gi, (_, level) =>
     '<span class="msg-confidence msg-confidence-' + level.toLowerCase() + '">Confidence: ' + escHtml(level) + '</span>'
