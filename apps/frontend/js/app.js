@@ -40,6 +40,7 @@ window.appBoot = function () {
   initQueryBox();
   initProfile();
   initArchives();
+  initIntelDeck();
   initSignOut();
   loadCohorts();
   loadWorkflowPanels();
@@ -73,11 +74,11 @@ function initWorkflowModes() {
       document.querySelectorAll(".mode-chip").forEach(b => b.classList.toggle("active", b === btn));
       const input = document.getElementById("main-query");
       if (workflowMode === "ask") {
-        input.placeholder = "Ask anything, search, or request research…";
+        input.placeholder = "Query the mesh — research, chat, web…";
       } else if (workflowMode === "task") {
-        input.placeholder = "Task title or description (saved without AI)…";
+        input.placeholder = "Task payload (no AI — raw save)…";
       } else {
-        input.placeholder = "Note text (saved without AI)…";
+        input.placeholder = "Note / log line (no AI)…";
       }
       input.focus();
     });
@@ -143,11 +144,56 @@ function initQueryBox() {
   });
 }
 
+function closeIntelDeck() {
+  if (!document.body.classList.contains("intel-open")) return;
+  document.body.classList.remove("intel-open");
+  const scrim = document.getElementById("intel-scrim");
+  const toggle = document.getElementById("intel-toggle");
+  if (scrim) scrim.setAttribute("aria-hidden", "true");
+  if (toggle) toggle.setAttribute("aria-expanded", "false");
+  document.body.style.overflow = "";
+}
+
+function initIntelDeck() {
+  const toggle = document.getElementById("intel-toggle");
+  const scrim = document.getElementById("intel-scrim");
+  if (!toggle || !scrim) return;
+
+  function openIntelDeck() {
+    document.body.classList.add("intel-open");
+    toggle.setAttribute("aria-expanded", "true");
+    scrim.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+
+  toggle.addEventListener("click", function () {
+    if (document.body.classList.contains("intel-open")) {
+      closeIntelDeck();
+    } else {
+      openIntelDeck();
+    }
+  });
+
+  scrim.addEventListener("click", closeIntelDeck);
+
+  window.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && document.body.classList.contains("intel-open")) {
+      closeIntelDeck();
+    }
+  });
+
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 901) closeIntelDeck();
+  });
+}
+
 async function submitQuery() {
   const input = document.getElementById("main-query");
   const execBtn = document.getElementById("exec-btn");
   const q = input.value.trim();
   if (!q) return;
+
+  closeIntelDeck();
 
   // Prevent double-submission while processing
   if (execBtn.disabled) return;
@@ -572,7 +618,10 @@ async function loadCohorts() {
 
 // ── Archives overlay ──────────────────────────────────────
 function initArchives() {
-  document.getElementById("archives-toggle").addEventListener("click", () => openArchives());
+  document.getElementById("archives-toggle").addEventListener("click", () => {
+    closeIntelDeck();
+    openArchives();
+  });
   document.getElementById("close-archives").addEventListener("click", () =>
     document.getElementById("archives-overlay").classList.add("hidden")
   );
@@ -587,6 +636,7 @@ function initProfile() {
   const statusEl = document.getElementById("profile-status");
 
   openBtn.addEventListener("click", () => {
+    closeIntelDeck();
     statusEl.textContent = "";
     overlay.classList.remove("hidden");
   });

@@ -2,21 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>All-Doing Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0c0f" />
+  <title>ALL-DOING // intel terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body>
+<body class="theme-hacker">
 
   <!-- LOGIN SCREEN -->
   <div id="login-overlay">
-    <div class="login-panel">
+    <div class="login-panel frame-corners">
+      <div class="login-glitch" aria-hidden="true">// SECURE CHANNEL</div>
       <div class="login-header">
-        <h1>Welcome back</h1>
+        <h1>ALL-DOING</h1>
+        <p class="login-tagline">local intelligence terminal</p>
         <div class="login-status-row">
           <span class="blink-dot"></span>
-          <span class="login-status-text">Sign in to continue</span>
+          <span class="login-status-text">awaiting credentials</span>
         </div>
       </div>
       <div class="login-divider"></div>
@@ -26,26 +32,33 @@
   </div>
 
   <!-- MAIN APP (hidden until auth) -->
-  <div id="terminal-root" style="display:none">
+  <div id="terminal-root" class="terminal-root" style="display:none">
 
     <!-- TOP BAR -->
     <div id="backend-banner" class="backend-banner hidden" role="alert"></div>
 
     <header class="top-bar">
       <div class="top-bar-left">
-        <span class="top-logo">all-doing</span>
+        <button type="button" class="intel-toggle" id="intel-toggle" aria-label="Open session intel panel" aria-expanded="false" aria-controls="intel-deck">
+          <span class="intel-toggle-icon" aria-hidden="true"></span>
+          <span class="intel-toggle-text">INTEL</span>
+        </button>
+        <span class="top-logo"><span class="top-logo-mark">⟩</span> ALL-DOING</span>
       </div>
       <div class="top-bar-center">
-        <span id="sys-time" class="sys-time"></span>
-        <span class="sys-sep">&middot;</span>
-        <span id="sys-status" class="sys-status online">Online</span>
+        <span class="top-prompt-prefix" aria-hidden="true">SYS</span>
+        <span id="sys-time" class="sys-time mono-nums"></span>
+        <span class="sys-sep" aria-hidden="true">│</span>
+        <span id="sys-status" class="sys-status online">LINK_OK</span>
       </div>
       <div class="top-bar-right">
-        <button class="icon-btn" id="profile-toggle" title="Profile" aria-label="Profile">Profile</button>
-        <button class="icon-btn" id="archives-toggle" title="Collections" aria-label="Collections">Collections</button>
-        <button class="icon-btn danger" id="signout-btn" title="Sign Out" aria-label="Sign out">Sign out</button>
+        <button class="icon-btn" id="profile-toggle" title="Profile" aria-label="Profile">DATA</button>
+        <button class="icon-btn" id="archives-toggle" title="Collections" aria-label="Collections">ARCHIVE</button>
+        <button class="icon-btn danger" id="signout-btn" title="Sign Out" aria-label="Sign out">EXIT</button>
       </div>
     </header>
+
+    <div class="intel-scrim" id="intel-scrim" aria-hidden="true"></div>
 
     <!-- MAIN LAYOUT -->
     <main class="main-layout" role="main">
@@ -54,10 +67,13 @@
       <section class="col-feed">
 
         <!-- Query input -->
-        <div class="query-box">
+        <div class="query-box frame-corners">
           <div class="query-input-row">
-            <input type="text" id="main-query" placeholder="Ask anything, search, or request research..." autocomplete="off" spellcheck="false" aria-label="Query input" />
-            <button id="exec-btn" class="exec-btn" aria-label="Send">Send</button>
+            <label class="query-compose" for="main-query">
+              <span class="input-prompt" aria-hidden="true">&gt;</span>
+              <input type="text" id="main-query" placeholder="signal in — query, task, or note..." autocomplete="off" spellcheck="false" aria-label="Query input" />
+            </label>
+            <button id="exec-btn" class="exec-btn" aria-label="Send"><span class="exec-btn-label">TRANSMIT</span></button>
           </div>
           <div class="query-examples workflow-modes">
             <button type="button" class="mode-chip active" data-mode="ask" title="Chat or long research pipeline">Ask</button>
@@ -69,7 +85,7 @@
         <!-- Chat thread -->
         <div class="feed-box chat-feed">
           <div class="feed-header">
-            <span class="feed-title">Chat</span>
+            <span class="feed-title"><span class="feed-prompt" aria-hidden="true">~</span> channel / ask</span>
             <span id="task-badge" class="task-badge hidden">Processing</span>
             <button class="clear-btn" id="clear-log" aria-label="Clear chat">Clear</button>
           </div>
@@ -83,8 +99,8 @@
 
       </section>
 
-      <!-- RIGHT COLUMN: STATUS + SIDEBAR -->
-      <aside class="col-aside">
+      <!-- RIGHT COLUMN: STATUS + SIDEBAR — drawer below 901px -->
+      <aside class="col-aside" id="intel-deck" aria-label="Session intel">
 
         <!-- Task status -->
         <div class="status-card">
