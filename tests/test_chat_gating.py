@@ -14,6 +14,18 @@ def test_chat_looks_like_search_reviews() -> None:
     assert not chat_looks_like_search("hi")
 
 
+def test_chat_is_smalltalk_no_web() -> None:
+    from apps.backend.services.chat_service import chat_is_smalltalk_no_web, chat_looks_like_search
+
+    assert chat_is_smalltalk_no_web("hello")
+    assert chat_is_smalltalk_no_web("HELLO!!")
+    assert chat_is_smalltalk_no_web("thanks")
+    assert chat_is_smalltalk_no_web("what's up")
+    assert not chat_is_smalltalk_no_web("hello tell me the reviews")
+    assert chat_looks_like_search("hello tell me the reviews")
+    assert not chat_is_smalltalk_no_web("this is a much longer greeting that is not in the allowlist")
+
+
 def test_dedupe_entries_by_source() -> None:
     from apps.backend.services.chat_service import dedupe_entries_by_source
 

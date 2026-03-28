@@ -22,12 +22,13 @@ You route the CURRENT user message for a careful assistant. Reply with JSON ONLY
 {{"needs_web": boolean, "ask_user_first": boolean, "ask_user_message": string, "search_query": string}}
 {prior_block}
 Definitions:
-- needs_web: true if a good answer normally requires verifiable or up-to-date external facts (movie/show/game reviews or cast, news, sports results, product specs, niche biographies, "is X true", release dates, prices). false for stable general knowledge (e.g. capitals of well-known countries), math, logic, pure coding, creative writing, obvious metaphors/jokes with no factual claim, or vague philosophy.
+- needs_web: true if a good answer normally requires verifiable or up-to-date external facts (movie/show/game reviews or cast, news, sports results, product specs, niche biographies, "is X true", release dates, prices). false for stable general knowledge (e.g. capitals of well-known countries), math, logic, pure coding, creative writing, obvious metaphors/jokes with no factual claim, or vague philosophy. false for standalone greetings or thanks alone (e.g. "hello", "hi", "thanks", "bye") — those do not need the web.
 - ask_user_first: true only if the CURRENT message is too vague to search AND the prior conversation does NOT supply a clear topic (e.g. pronouns like "it/this" with no entity in prior turns). If prior turns name a movie/product/person, resolve references and set ask_user_first false.
 - ask_user_message: non-empty only when ask_user_first is true (one short clarifying question).
 - search_query: when needs_web is true and ask_user_first is false, a concise web-search query (under 120 characters) with real entity names and year if relevant. Merge context from prior turns (e.g. user previously said "Dhurandhar 2" and now says "2026 reviews" -> search_query "Dhurandhar 2 movie reviews 2026"). Do NOT paste vague chat as the query.
 
 Examples (no prior):
+- "hello" or "hi" or "thanks" -> {{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}}
 - "capital of France" -> {{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}}
 - "capital of my heart" -> {{"needs_web": false, "ask_user_first": false, "ask_user_message": "", "search_query": ""}}
 - "reviews of Dhurandhar 2 movie" -> {{"needs_web": true, "ask_user_first": false, "ask_user_message": "", "search_query": "Dhurandhar 2 movie reviews"}}

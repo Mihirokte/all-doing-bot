@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 from apps.backend.config import settings
@@ -96,6 +97,83 @@ def chat_looks_like_search(query: str) -> bool:
         "source for",
     )
     return any(t in lower for t in triggers)
+
+
+# Standalone greetings / thanks / closures — short enough that web search
+# usually returns noise (e.g. Wikipedia "Hello" song) instead of a reply.
+_SMALLTALK_MAX_LEN = 56
+_SMALLTALK_PHRASES = frozenset(
+    {
+        "hi",
+        "hello",
+        "hey",
+        "howdy",
+        "yo",
+        "sup",
+        "hiya",
+        "hai",
+        "heya",
+        "thanks",
+        "thank you",
+        "thank u",
+        "thx",
+        "ty",
+        "tysm",
+        "tyvm",
+        "bye",
+        "goodbye",
+        "cya",
+        "see you",
+        "ok",
+        "okay",
+        "k",
+        "yes",
+        "no",
+        "yep",
+        "nope",
+        "yeah",
+        "nah",
+        "sure",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "good night",
+        "whats up",
+        "what's up",
+        "whatsup",
+        "wassup",
+        "how are you",
+        "how r u",
+        "how are u",
+        "hi there",
+        "hello there",
+        "hey there",
+        "morning",
+        "evening",
+        "afternoon",
+        "cheers",
+        "np",
+        "no problem",
+        "you're welcome",
+        "your welcome",
+    }
+)
+
+
+def chat_is_smalltalk_no_web(query: str) -> bool:
+    """
+    True for short social phrases that should not trigger web retrieval.
+
+    If the user also uses search-like wording, returns False so heuristics
+    and the web gate still apply.
+    """
+    raw = (query or "").strip()
+    if len(raw) > _SMALLTALK_MAX_LEN:
+        return False
+    q = raw.lower().replace("\u2019", "'")
+    q = re.sub(r"\s+", " ", q).strip()
+    q = re.sub(r"[!?.~]+$", "", q).strip()
+    return q in _SMALLTALK_PHRASES
 
 
 def dedupe_entries_by_source(entries: list[Any], max_keep: int = 12) -> list[Any]:
@@ -290,7 +368,10 @@ async def handle_chat(query: str, session_key: str) -> dict[str, str]:
         return await reply((route.ask_user_message or "").strip())
 
     heuristic_search = chat_looks_like_search(query)
-    effective_web = bool(route.needs_web or heuristic_search)
+    if chat_is_smalltalk_no_web(query) and not heuristic_search:
+        effective_web = False
+    else:
+        effective_web = bool(route.needs_web or heuristic_search)
     search_q = (route.search_query or "").strip() or query
 
     if effective_web:
