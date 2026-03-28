@@ -10,6 +10,21 @@ Read these first:
 - [docs/instructions/backend-workflow.md](./docs/instructions/backend-workflow.md) when changing backend code
 - [docs/instructions/frontend-workflow.md](./docs/instructions/frontend-workflow.md) when changing frontend code
 
+## Production backend — SSH update (mandatory)
+
+After **any** change under `apps/backend/` (or anything that affects the running FastAPI service on EC2), the agent **must** deploy that code to the production host **over SSH** in the same session whenever the environment has network access and SSH credentials (or can run non-interactively). Leaving `main` updated on GitHub **without** updating the EC2 process is incomplete.
+
+1. **Push** `main` first (see workspace push rules).
+2. **Run the remote update** (same steps as `.github/workflows/deploy-ec2.yml`):
+   - **Windows (PowerShell):**  
+     `powershell -NoProfile -ExecutionPolicy Bypass -File apps/backend/deploy/Invoke-Ec2BackendUpdate.ps1`  
+     with `EC2_HOST` set (and `EC2_USER` / `SSH_KEY` if not default). The script pipes `ec2-pull-restart.sh` to `ssh user@host bash -s`.
+   - **macOS / Linux / Git Bash:**  
+     `EC2_HOST=... EC2_USER=ubuntu ./apps/backend/deploy/ec2-ssh-pull-restart-from-local.sh`
+3. **If SSH is not possible** (no key in this environment, headless CI without secrets): state that explicitly in the reply and tell the human to run one of the commands above or **Actions → Deploy backend (EC2) → Run workflow** (requires repo secrets `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
+
+Reference: [apps/backend/deploy/ec2-runbook.md](./apps/backend/deploy/ec2-runbook.md), [docs/deployment/aws-credentials-and-deploy.md](./docs/deployment/aws-credentials-and-deploy.md).
+
 ## Monorepo Layout
 
 ```text

@@ -79,18 +79,33 @@ Should return `{"status":"ok"}`. Frontend should use `BACKEND_URL=https://54-165
 
 ---
 
-## Later: update code and restart
+## Later: update code and restart (mandate for this repo)
 
-From your laptop (with SSH key):
+**Preferred (matches GitHub Actions):** pull `origin/main` on the instance, install deps, restart `alldoing` — see `ec2-pull-restart.sh`.
+
+From your laptop **with SSH**:
 
 ```bash
 export EC2_HOST=ec2-54-165-94-30.compute-1.amazonaws.com
-# export SSH_KEY=path/to/your-key.pem   # if not default
-bash apps/backend/deploy/deploy-from-local.sh
+export EC2_USER=ubuntu   # or ec2-user on Amazon Linux
+# export SSH_KEY=~/.ssh/your-key.pem
+bash apps/backend/deploy/ec2-ssh-pull-restart-from-local.sh
 ```
 
-Or on the instance:
+**Windows (PowerShell):**
+
+```powershell
+$env:EC2_HOST = 'ec2-54-165-94-30.compute-1.amazonaws.com'
+$env:SSH_KEY = "$env:USERPROFILE\.ssh\your-key.pem"   # if needed
+powershell -NoProfile -ExecutionPolicy Bypass -File apps/backend/deploy/Invoke-Ec2BackendUpdate.ps1
+```
+
+**Full rsync + restart** (when you need to push uncommitted files): `apps/backend/deploy/deploy-from-local.sh`.
+
+Or **GitHub Actions** → **Deploy backend (EC2)** → **Run workflow** (requires secrets `EC2_HOST`, `EC2_USER`, `EC2_SSH_KEY`).
+
+On the instance manually:
 
 ```bash
-cd /home/ubuntu/all-doing-bot && sudo -u ubuntu git pull && sudo systemctl restart alldoing
+bash /home/ubuntu/all-doing-bot/apps/backend/deploy/ec2-pull-restart.sh
 ```
