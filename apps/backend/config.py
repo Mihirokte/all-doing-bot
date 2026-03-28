@@ -57,8 +57,8 @@ class Settings(BaseSettings):
         ]
     )
 
-    # Web search in chat: when False, search-like short queries are answered by LLM only (no SearXNG/deep search).
-    chat_web_search_enabled: bool = False
+    # Web search in chat: default on (SearXNG/MCP/deep search). Set CHAT_WEB_SEARCH_ENABLED=false to disable.
+    chat_web_search_enabled: bool = True
     # Structured LLM gate for /chat: needs_web + search query rewrite + vague-query clarification.
     chat_web_gate_enabled: bool = True
     # Deep Think-Do retrieval (short search queries: 3-cycle loop, evidence-first). Only used when chat_web_search_enabled is True.
